@@ -41,6 +41,6 @@ async function findOrCreate(params, { uid, schema }) {
     return entity;
 }
 
-exports = {
+module.exports = {
     findOrCreate,
 };
