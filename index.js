@@ -67,6 +67,14 @@ async function findOrCreate(params, { uid, schema }) {
     return entity;
 }
 
+async function deleteAllEntites(uid) {
+    const tickerEntities = await strapi.entityService.findMany(uid); //?
+    for (const tickerEntity of tickerEntities) {
+        await strapi.entityService.delete(uid, tickerEntity.id);
+    }
+}
+
 module.exports = {
     findOrCreate,
+    deleteAllEntites,
 };
