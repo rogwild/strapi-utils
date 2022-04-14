@@ -1,6 +1,6 @@
 {
     "name": "@rogwild/strapi-utils",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Additional fuctions for Strapi 4",
     "main": "index.js",
     "scripts": {},
