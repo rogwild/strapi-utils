@@ -1,9 +1,19 @@
 {
-    "name": "strapi-utils",
+    "name": "@rogwild/strapi-utils",
     "version": "1.0.0",
     "description": "Additional fuctions for Strapi 4",
     "main": "index.js",
     "scripts": {},
     "author": "rogwild",
-    "license": "ISC"
+    "license": "ISC",
+    "dependencies": {},
+    "devDependencies": {},
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/rogwild/strapi-utils.git"
+    },
+    "bugs": {
+        "url": "https://github.com/rogwild/strapi-utils/issues"
+    },
+    "homepage": "https://github.com/rogwild/strapi-utils#readme"
 }
