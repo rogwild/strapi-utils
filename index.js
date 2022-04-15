@@ -80,7 +80,25 @@ async function deleteAllEntites(uid) {
     }
 }
 
+const setPermissions = async () => {
+    const queryKey = 'plugin::users-permissions.permission';
+
+    const currentPermissions = await strapi.query(queryKey).findMany();
+    const configPermissions = strapi.config.get('permissions');
+
+    const toDelete = currentPermissions.map(({ action }) => action);
+    const toCreate = Object.values(configPermissions).flatMap(({ role, actions }) =>
+        Object.entries(actions)
+            .filter(([key, arr]) => arr.length)
+            .flatMap(([key, arr]) => arr.flatMap((val) => ({ action: `${key}.${val}`, role })))
+    );
+
+    await Promise.all(toDelete.map((item) => strapi.query(queryKey).delete({ where: { action: item } })));
+    await Promise.all(toCreate.map((item) => strapi.query(queryKey).create({ data: item })));
+};
+
 module.exports = {
     findOrCreate,
     deleteAllEntites,
+    setPermissions,
 };
