@@ -80,6 +80,38 @@ async function deleteAllEntites(uid) {
     }
 }
 
+/* ./config/permissions.js
+ * module.exports = ({ env }) => ({
+ *     authenticated: {
+ *         role: 1,
+ *         actions: {
+ *             'plugin::content-type-builder.components': [],
+ *             'plugin::content-type-builder.content-types': [],
+ *             'plugin::email.email': [],
+ *             'plugin::upload.content-api': [],
+ *             'plugin::i18n.locales': [],
+ *             'plugin::users-permissions.auth': ['connect'],
+ *             'plugin::users-permissions.user': ['me', 'update'],
+ *             'plugin::users-permissions.role': [],
+ *             'plugin::users-permissions.permission': [],
+ *         },
+ *     },
+ *     public: {
+ *         role: 2,
+ *         actions: {
+ *             'plugin::content-type-builder.components': [],
+ *             'plugin::content-type-builder.content-types': [],
+ *             'plugin::email.email': [],
+ *             'plugin::upload.content-api': [],
+ *             'plugin::i18n.locales': [],
+ *             'plugin::users-permissions.auth': ['connect', 'callback'],
+ *             'plugin::users-permissions.user': ['me'],
+ *             'plugin::users-permissions.role': [],
+ *             'plugin::users-permissions.permissiosn': [],
+ *         },
+ *     },
+ * });
+ */
 const setPermissions = async () => {
     const queryKey = 'plugin::users-permissions.permission';
 
