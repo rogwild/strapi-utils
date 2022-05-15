@@ -1,3 +1,29 @@
+function sanitizeDataForClone({ data, keysForIds = [] }) {
+    const sanitized = {};
+    for (const entry of Object.entries(data)) {
+        entry;
+        if (entry[0] !== 'id') {
+            if (typeof entry[1] === 'object' && entry[1] !== null) {
+                if (keysForIds.includes(entry[0])) {
+                    sanitized[entry[0]] = entry[1].id;
+                    continue;
+                }
+                if (Array.isArray(entry[1])) {
+                    sanitized[entry[0]] = [];
+                    for (const entryItem of entry[1]) {
+                        sanitized[entry[0]].push(sanitizeDataForClone({ data: entryItem }));
+                    }
+                } else {
+                    sanitized[entry[0]] = sanitizeDataForClone({ data: entry[1] });
+                }
+            } else {
+                sanitized[entry[0]] = entry[1];
+            }
+        }
+    }
+    return sanitized;
+}
+
 function assignFilterKeys({ schema, config, data }) {
     const filters = {};
     const attributes = schema.attributes;
@@ -130,6 +156,7 @@ const setPermissions = async () => {
 };
 
 module.exports = {
+    sanitizeDataForClone,
     findOrCreate,
     deleteAllEntites,
     setPermissions,

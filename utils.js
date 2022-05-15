@@ -522,4 +522,148 @@ const clearFields = ({ data, dataKey, files }) => {
     return modified;
 };
 
-const res = clearFields({ data, files });
+const oldData = {
+    id: 62,
+    createdAt: '2022-05-15T12:03:01.379Z',
+    updatedAt: '2022-05-15T14:28:37.448Z',
+    publishedAt: '2022-05-15T12:03:01.289Z',
+    invest_unit_price: 10000,
+    is_history: false,
+    installments_enabled: true,
+    project_credential_index: 0,
+    contract_was_readed: false,
+    is_investor: true,
+    units: '20',
+    invested_at: '2022-05-14T22:11:00.000Z',
+    user: {
+        id: 7,
+        username: 'finmajor@finmajor.ru',
+        email: 'finmajor@finmajor.ru',
+        provider: 'local',
+        password: '$2a$10$eqxn7ddpGP1xeKB91kG8CecG2x8TnhhtU45MjCfZzzklQJesPvLhC',
+        resetPasswordToken: null,
+        confirmationToken: null,
+        confirmed: true,
+        blocked: false,
+        createdAt: '2022-05-03T14:09:07.513Z',
+        updatedAt: '2022-05-09T12:41:28.596Z',
+        phone_number: '+79312788449',
+        name: 'Финмажор',
+        phone_number_confirmed: true,
+        phoneNumberConfirmationToken: null,
+        otp_secret: null,
+    },
+    project: {
+        id: 130,
+        title: 'Название проекта 130',
+        status: 'active',
+        type: 'close',
+        createdAt: '2022-04-25T17:55:50.670Z',
+        updatedAt: '2022-05-15T12:18:01.983Z',
+        publishedAt: '2022-05-15T10:20:11.718Z',
+        description: 'О проекте',
+        starts_at: '2022-04-28',
+        ends_at: '2022-04-30',
+        fundraising_amount: '1000000',
+        initial_units: 100,
+        roi: 45,
+        fundraising_starts_at: '2022-04-28',
+        fundraising_ends_at: '2022-04-30',
+        funds_management_fee: 3,
+        max_drawdown: 45,
+        deposit_timing: 3,
+        withdraw_delay: 4,
+        auto_compound: true,
+        special_terms: 'Особые условия',
+        installments_enabled: true,
+        initial_unit_price: 10000,
+    },
+    investor_terms: {
+        id: 174,
+        min_amount: '50000',
+        user_share: 1,
+    },
+    lender_terms: {
+        id: 175,
+        min_amount: '60000',
+        user_share: 2,
+    },
+    investment_stages: [
+        {
+            id: 104,
+            units: 13,
+            stage_index: 0,
+        },
+        {
+            id: 105,
+            units: 13,
+            stage_index: 1,
+        },
+        {
+            id: 106,
+            units: 12,
+            stage_index: 2,
+        },
+    ],
+    currency: {
+        id: 1,
+        title: 'rub',
+        symbol: 'rub',
+        type: 'fiat',
+        createdAt: '2022-04-25T05:07:06.702Z',
+        updatedAt: '2022-04-29T10:16:08.876Z',
+        publishedAt: '2022-04-25T05:07:11.147Z',
+        unicode: '₽',
+    },
+    contracts: [
+        {
+            id: 16,
+            is_signed: true,
+            was_readed: false,
+        },
+    ],
+    createdBy: null,
+    updatedBy: {
+        id: 1,
+        firstname: 'finmajor',
+        lastname: 'finmajor',
+        username: 'finmajor',
+        email: 'finmajor@finmajor.com',
+        password: '$2a$10$n7rcBersbnI3pZ.XV7zlmO75eO.e0PzSg7TX9YK4qcXwtln1Y2C2G',
+        resetPasswordToken: null,
+        registrationToken: null,
+        isActive: true,
+        blocked: false,
+        preferedLanguage: null,
+        createdAt: '2022-04-14T23:46:35.076Z',
+        updatedAt: '2022-05-11T12:38:30.079Z',
+    },
+};
+
+const sanitizeDataForClone = ({ data, keysForIds = [] }) => {
+    const sanitized = {};
+    for (const entry of Object.entries(data)) {
+        entry;
+        if (entry[0] !== 'id') {
+            if (typeof entry[1] === 'object' && entry[1] !== null) {
+                if (keysForIds.includes(entry[0])) {
+                    sanitized[entry[0]] = entry[1].id;
+                    continue;
+                }
+                if (Array.isArray(entry[1])) {
+                    sanitized[entry[0]] = [];
+                    for (const entryItem of entry[1]) {
+                        sanitized[entry[0]].push(sanitizeDataForClone({ data: entryItem }));
+                    }
+                } else {
+                    sanitized[entry[0]] = sanitizeDataForClone({ data: entry[1] });
+                }
+            } else {
+                sanitized[entry[0]] = entry[1];
+            }
+        }
+    }
+    return sanitized;
+};
+
+const res = sanitizeDataForClone({ data: oldData, keysForIds: ['user', 'project', 'currency'] });
