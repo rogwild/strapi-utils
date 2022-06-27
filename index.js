@@ -8,8 +8,17 @@ const sanitizeDataForClone = ({ data, keysForIds = [] }) => {
             if (typeof entry[1] === 'object' && entry[1] !== null) {
                 entry[0];
                 if (keysForIds.includes(entry[0])) {
-                    sanitized[entry[0]] = entry[1].id;
-                    continue;
+                    if(Array.isArray(entry[1])) {
+                        sanitized[entry[0]] = [];
+                        for (const entryItem of entry[1]) {
+                            entryItem;
+                            sanitized[entry[0]].push(entryItem.id);
+                        }
+                        continue;
+                    } else {
+                        sanitized[entry[0]] = entry[1].id;
+                        continue;
+                    }
                 }
                 if (Array.isArray(entry[1])) {
                     entry[1];
