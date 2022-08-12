@@ -1,3 +1,5 @@
+const tdd = require('./tdd');
+
 const sanitizeDataForClone = ({ data, keysForIds = [] }) => {
     data;
     const sanitized = {};
@@ -8,7 +10,7 @@ const sanitizeDataForClone = ({ data, keysForIds = [] }) => {
             if (typeof entry[1] === 'object' && entry[1] !== null) {
                 entry[0];
                 if (keysForIds.includes(entry[0])) {
-                    if(Array.isArray(entry[1])) {
+                    if (Array.isArray(entry[1])) {
                         sanitized[entry[0]] = [];
                         for (const entryItem of entry[1]) {
                             entryItem;
@@ -182,6 +184,7 @@ const setPermissions = async () => {
 };
 
 module.exports = {
+    tdd,
     sanitizeDataForClone,
     findOrCreate,
     deleteAllEntites,
