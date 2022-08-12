@@ -1,5 +1,3 @@
-const R = require('ramda');
-
 const undefinedToNull = (x) =>
     Object.keys(x).reduce((p, c) => {
         p[c] = x[c] || null;
@@ -69,7 +67,7 @@ function assertTypes(result, expectation, expKey) {
         return false;
     }
 
-    return R.all((x) => x === true, results); //?
+    return results.every((x) => x === true);
 }
 
 /**
