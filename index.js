@@ -1,5 +1,4 @@
 const tdd = require('./tdd');
-const api = require('./api');
 
 const sanitizeDataForClone = ({ data, keysForIds = [] }) => {
     data;
@@ -186,7 +185,6 @@ const setPermissions = async () => {
 
 module.exports = {
     tdd,
-    api,
     sanitizeDataForClone,
     findOrCreate,
     deleteAllEntites,
