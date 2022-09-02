@@ -2,12 +2,39 @@
     "name": "@rogwild/strapi-utils",
     "version": "1.7.0",
     "description": "Additional fuctions for Strapi 4",
-    "main": "index.js",
-    "scripts": {},
+    "main": "src/index.js",
+    "files": [
+        "src"
+    ],
+    "engines": {
+        "node": ">=16"
+    },
+    "scripts": {
+        "format:check": "prettier --check .",
+        "format:write": "prettier --write .",
+        "lint:check": "eslint .",
+        "lint:fix": "eslint --fix .",
+        "develop": "nodemon index.js"
+    },
     "author": "rogwild",
     "license": "ISC",
-    "dependencies": {},
-    "devDependencies": {},
+    "dependencies": {
+        "@strapi/strapi": "^4.3.6",
+        "axios": "^0.27.2",
+        "lodash": "^4.17.21",
+        "nodemailer": "^6.7.8",
+        "sendpulse-api": "^1.1.5"
+    },
+    "devDependencies": {
+        "@rollup/plugin-commonjs": "^22.0.2",
+        "@rollup/plugin-node-resolve": "^13.3.0",
+        "eslint-config-prettier": "^8.5.0",
+        "nodemon": "^2.0.19",
+        "prettier": "^2.7.1"
+    },
+    "peerDependencies": {
+        "@strapi/strapi": "^4.3.6"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/rogwild/strapi-utils.git"
