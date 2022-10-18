@@ -36,6 +36,20 @@ module.exports = {
                     )
                 );
             },
+            addEmails: async (options) => {
+                const { addressBookId, emails } = options;
+
+                return new Promise((resolve, reject) =>
+                    sendpulse.addEmails(
+                        (dataOrError) =>
+                            dataOrError.is_error || dataOrError.error_code
+                                ? reject(dataOrError)
+                                : resolve(dataOrError),
+                        addressBookId,
+                        emails
+                    )
+                );
+            },
         };
     },
 };
