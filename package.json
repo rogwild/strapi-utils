@@ -1,6 +1,8 @@
 {
     "name": "@rogwild/strapi-utils",
     "version": "2.0.2",
+    "author": "rogwild",
+    "license": "ISC",
     "description": "Additional fuctions for Strapi 4",
     "main": "src/index.js",
     "files": [
@@ -16,14 +18,15 @@
         "lint:fix": "eslint --fix .",
         "develop": "nodemon index.js"
     },
-    "author": "rogwild",
-    "license": "ISC",
     "dependencies": {
+        "@strapi/plugin-users-permissions": "4.5.1",
         "@strapi/strapi": "^4.3.6",
         "axios": "^0.27.2",
         "lodash": "^4.17.21",
         "nodemailer": "^6.7.8",
-        "sendpulse-api": "^1.1.5"
+        "qrcode": "^1.5.1",
+        "sendpulse-api": "^1.1.5",
+        "speakeasy": "^2.0.0"
     },
     "devDependencies": {
         "@rollup/plugin-commonjs": "^22.0.2",

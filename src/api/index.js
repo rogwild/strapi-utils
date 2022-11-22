@@ -8,6 +8,7 @@ const parseBody = require('./parse-body');
 const customizeCoreStrapi = require('./customize-core-strapi');
 const lifecycleActions = require('./lifecycle-actions');
 const middlewares = require('./middlewares');
+const mfa = require('./mfa');
 
 module.exports = {
     setPermissions,
@@ -20,4 +21,5 @@ module.exports = {
     ...transformers,
     ...lifecycleActions,
     ...middlewares,
+    mfa,
 };
