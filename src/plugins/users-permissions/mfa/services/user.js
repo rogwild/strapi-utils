@@ -112,6 +112,10 @@ module.exports = {
     },
 
     async sendPhoneConfirmation(user) {
+        const userService = getService('user');
+        if (typeof userService.sendPhoneConfirmationCode !== 'function')
+            throw new ApplicationError('userService.sendPhoneConfirmationCode method not defined');
+
         const phoneNumberConfirmationToken = `${Math.floor(100000 + Math.random() * 900000)}`;
 
         await strapi.entityService.update('plugin::users-permissions.user', user.id, {
@@ -119,8 +123,6 @@ module.exports = {
         });
 
         console.log('send sms code:', phoneNumberConfirmationToken);
-
-        const userService = getService('user');
 
         await userService.sendPhoneConfirmationCode({
             phoneNumber: user.phone_number,
