@@ -25,7 +25,7 @@ const sanitizeUser = (user, ctx) => {
 
 module.exports = {
     async emailConfirmation(ctx) {
-        const { confirmation: confirmationToken } = ctx.query;
+        const { code: confirmationToken, email } = ctx.query;
 
         const userService = getService('user');
         const jwtService = getService('jwt');
@@ -37,6 +37,7 @@ module.exports = {
         const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
             filters: {
                 confirmationToken,
+                email,
             },
         });
 
