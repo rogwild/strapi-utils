@@ -140,4 +140,14 @@ module.exports = {
             user: await sanitizeUser(user, ctx),
         });
     },
+
+    /**
+     * @todo
+     */
+    async sendPhoneConfirmation(ctx) {},
+
+    /**
+     * @todo
+     */
+    async phoneConfirmation(ctx) {},
 };
