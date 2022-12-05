@@ -1,9 +1,6 @@
 'use strict';
 
 const _ = require('lodash');
-const { parseBody } = require('@strapi/strapi/lib/core-api/controller/transform');
-const speakeasy = require('speakeasy');
-
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 const {
     validateSendEmailConfirmationBody,
@@ -11,7 +8,6 @@ const {
 
 const utils = require('@strapi/utils');
 const { sanitize } = utils;
-const { ApplicationError, ValidationError } = utils.errors;
 
 const emailRegExp =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -31,7 +27,7 @@ module.exports = {
         const jwtService = getService('jwt');
 
         if (_.isEmpty(confirmationToken)) {
-            throw new ValidationError('token.invalid');
+            return ctx.badRequest('Token is invalid');
         }
 
         const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
@@ -42,7 +38,7 @@ module.exports = {
         });
 
         if (!user) {
-            throw new ValidationError('token.invalid');
+            return ctx.badRequest('Token is invalid');
         }
 
         await userService.edit(user.id, { confirmed: true, confirmationToken: null });
@@ -63,7 +59,7 @@ module.exports = {
         const isEmail = emailRegExp.test(params.email);
 
         if (!isEmail) {
-            throw new ValidationError('wrong.email');
+            return ctx.badRequest('Wrong email');
         }
 
         let user = await strapi.query('plugin::users-permissions.user').findOne({
@@ -88,23 +84,23 @@ module.exports = {
             }
 
             if (!user) {
-                throw new ValidationError('no.user');
+                return ctx.badRequest('No user');
             }
         }
 
         if (user.blocked) {
-            throw new ApplicationError('blocked.user');
+            return ctx.badRequest('User is blocked');
         }
 
         try {
-            await getService('user').sendConfirmationEmail(user);
+            await getService('user').sendConfirmationEmail({ user, ctx });
             ctx.send({
                 email: user.email,
                 sent: true,
             });
         } catch (err) {
             console.log(err);
-            throw new ApplicationError(err.message);
+            return ctx.badRequest(err.message);
         }
     },
 

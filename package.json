@@ -16,11 +16,12 @@
         "format:write": "prettier --write .",
         "lint:check": "eslint .",
         "lint:fix": "eslint --fix .",
-        "develop": "nodemon index.js"
+        "develop": "nodemon index.js",
+        "build": "rollup -c"
     },
     "dependencies": {
-        "@strapi/plugin-users-permissions": "4.5.1",
-        "@strapi/strapi": "^4.3.6",
+        "@rollup/plugin-babel": "^6.0.3",
+        "@rollup/plugin-json": "^5.0.2",
         "axios": "^0.27.2",
         "lodash": "^4.17.21",
         "nodemailer": "^6.7.8",
@@ -29,14 +30,21 @@
         "speakeasy": "^2.0.0"
     },
     "devDependencies": {
+        "@babel/preset-env": "^7.20.2",
         "@rollup/plugin-commonjs": "^22.0.2",
         "@rollup/plugin-node-resolve": "^13.3.0",
+        "@rollup/plugin-typescript": "^8.5.0",
+        "@strapi/plugin-i18n": "^4.5.3",
+        "@strapi/plugin-users-permissions": "^4.5.3",
+        "@strapi/strapi": "^4.5.3",
         "eslint-config-prettier": "^8.5.0",
-        "nodemon": "^2.0.19",
-        "prettier": "^2.7.1"
+        "prettier": "^2.7.1",
+        "rollup": "^2.78.0"
     },
     "peerDependencies": {
-        "@strapi/strapi": "^4.3.6"
+        "@strapi/plugin-i18n": "^4.5.3",
+        "@strapi/plugin-users-permissions": "^4.5.3",
+        "@strapi/strapi": "^4.5.3"
     },
     "repository": {
         "type": "git",

@@ -2,10 +2,7 @@ const speakeasy = require('speakeasy');
 const QR = require('qrcode');
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 const { parseBody } = require('@strapi/strapi/lib/core-api/controller/transform');
-
-const utils = require('@strapi/utils');
-const { sanitize } = utils;
-const { ApplicationError, ValidationError } = utils.errors;
+const { sanitize } = require('@strapi/utils');
 
 const sanitizeUser = (user, ctx) => {
     const { auth } = ctx.state;
@@ -30,7 +27,7 @@ module.exports = {
                 resolve(data_url);
             })
         ).catch((err) => {
-            throw new ApplicationError(err.message);
+            ctx.badRequest(err.message);
         });
 
         const secretHashCode = secret.base32;
@@ -47,8 +44,8 @@ module.exports = {
         const { id } = ctx.params;
         const user = await strapi.entityService.findOne('plugin::users-permissions.user', id);
 
-        if (user.otp_enabled) {
-            throw new ApplicationError('Delete previous OTP before adding new');
+        if (user.is_otp_enabled) {
+            return ctx.badRequest('Delete previous OTP before adding new');
         }
 
         if (data.otp_secret && data.code) {
@@ -59,14 +56,16 @@ module.exports = {
             });
 
             if (!isValid) {
-                throw new ValidationError('Invalid code');
+                return ctx.badRequest('Invalid code');
             }
         }
+
+        console.log('after throw');
 
         const entity = await strapi.entityService.update('plugin::users-permissions.user', id, {
             data: {
                 otp_secret: data.otp_secret,
-                otp_enabled: true,
+                is_otp_enabled: true,
             },
             files,
         });
@@ -85,7 +84,7 @@ module.exports = {
 
         const user = await userService.fetch(id);
         if (!user.otp_secret) {
-            throw new ValidationError('2FA is not active');
+            return ctx.badRequest('2FA is not active');
         }
 
         const isValid = speakeasy.totp.verify({
@@ -95,7 +94,7 @@ module.exports = {
         });
 
         if (!isValid) {
-            throw new ValidationError('Invalid code');
+            return ctx.badRequest('Invalid code');
         }
 
         ctx.send({

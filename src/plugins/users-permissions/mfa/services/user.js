@@ -1,9 +1,5 @@
 const urlJoin = require('url-join');
-const {
-    getAbsoluteServerUrl,
-    sanitize,
-    errors: { ApplicationError },
-} = require('@strapi/utils');
+const { getAbsoluteServerUrl, sanitize } = require('@strapi/utils');
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 
 const sanitizeUser = (user, ctx) => {
@@ -38,7 +34,7 @@ module.exports = {
         }
 
         if (user.confirmed) {
-            await userService.sendConfirmationEmail(user);
+            await userService.sendConfirmationEmail({ user, ctx });
             return ctx.send({
                 nextAuthFactor: 'email',
                 user: await sanitizeUser(user, ctx),
@@ -53,7 +49,7 @@ module.exports = {
         });
     },
 
-    async sendConfirmationEmail(user) {
+    async sendConfirmationEmail({ user, ctx }) {
         const userPermissionService = getService('users-permissions');
         const pluginStore = await strapi.store({ type: 'plugin', name: 'users-permissions' });
         const userSchema = strapi.getModel('plugin::users-permissions.user');
@@ -109,10 +105,11 @@ module.exports = {
             });
     },
 
-    async sendPhoneConfirmation(user) {
+    async sendPhoneConfirmation({ user, ctx }) {
         const userService = getService('user');
-        if (typeof userService.sendPhoneConfirmationCode !== 'function')
-            throw new ApplicationError('userService.sendPhoneConfirmationCode method not defined');
+        if (typeof userService.sendPhoneConfirmationCode !== 'function') {
+            return ctx.badRequest('userService.sendPhoneConfirmationCode method not defined');
+        }
 
         const phoneNumberConfirmationToken = `${Math.floor(100000 + Math.random() * 900000)}`;
 
