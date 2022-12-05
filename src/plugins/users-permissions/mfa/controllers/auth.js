@@ -108,39 +108,6 @@ module.exports = {
         }
     },
 
-    async generateOtpSecret(ctx) {
-        const secretCodes = await getService('user').createOtpSecret();
-        return ctx.send(secretCodes);
-    },
-
-    async checkOtp(ctx) {
-        const { id } = ctx.params;
-        const { code } = ctx.query;
-
-        const userService = getService('user');
-        const jwtService = getService('jwt');
-
-        const user = await userService.fetch(id);
-        if (!user.otp_secret) {
-            throw new ValidationError('2FA is not active');
-        }
-
-        const isValid = speakeasy.totp.verify({
-            secret: user.otp_secret,
-            encoding: 'base32',
-            token: code,
-        });
-
-        if (!isValid) {
-            throw new ValidationError('Invalid code');
-        }
-
-        ctx.send({
-            jwt: jwtService.issue({ id: user.id }),
-            user: await sanitizeUser(user, ctx),
-        });
-    },
-
     /**
      * @todo
      */

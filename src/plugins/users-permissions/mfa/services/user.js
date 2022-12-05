@@ -1,6 +1,4 @@
 const urlJoin = require('url-join');
-const speakeasy = require('speakeasy');
-const QR = require('qrcode');
 const {
     getAbsoluteServerUrl,
     sanitize,
@@ -128,30 +126,5 @@ module.exports = {
             phoneNumber: user.phone_number,
             phoneNumberConfirmationToken,
         });
-    },
-
-    async createOtpSecret() {
-        const secret = speakeasy.generateSecret({ length: 15, name: 'Finmajor' });
-        const secretQrCode = await new Promise((resolve, reject) =>
-            QR.toDataURL(secret.otpauth_url, (err, data_url) => {
-                if (err) {
-                    console.error('createOtpSecret QR.toDataURL', err?.message);
-                    reject({
-                        id: 'AuthFactor.error.qr-code.generate',
-                        message: err?.message,
-                    });
-                }
-                resolve(data_url);
-            })
-        ).catch((err) => {
-            throw new ApplicationError(err.message);
-        });
-
-        const secretHashCode = secret.base32;
-
-        return {
-            secretHashCode,
-            secretQrCode,
-        };
     },
 };
