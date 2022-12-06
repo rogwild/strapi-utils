@@ -15,7 +15,7 @@
         "strapi": true
     },
     "rules": {
-        "indent": ["error", 4, { "SwitchCase": 1 }],
+        "indent": ["warn", 4, { "SwitchCase": 1 }],
         "linebreak-style": ["error", "unix"],
         "quotes": ["warn", "single"],
         "semi": ["error", "always"],

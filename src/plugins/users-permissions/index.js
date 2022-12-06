@@ -1,5 +1,11 @@
-const mfa = require('./mfa');
+'use strict';
 
 module.exports = {
-    mfa,
+    controllers: {
+        auth: require('./controllers/auth'),
+        user: require('./controllers/user'),
+    },
+    services: {
+        user: require('./services/user'),
+    },
 };
