@@ -7,6 +7,7 @@ const {
     validateCreateUserBody,
     validateUpdateUserBody,
 } = require('@strapi/plugin-users-permissions/server/controllers/validation/user');
+const { getAuthFactorsParams } = require('../utils');
 
 const sanitizeOutput = (user, ctx) => {
     const { auth } = ctx.state;
@@ -106,6 +107,20 @@ module.exports = {
 
         ctx.send({
             jwt: jwtService.issue({ id: user.id }),
+            user: await sanitizeOutput(user, ctx),
+        });
+
+        const authFactors = getAuthFactorsParams('checkOtp');
+
+        if (authFactors.isLast) {
+            return ctx.send({
+                jwt: getService('jwt').issue({ id: user.id }),
+                user: await sanitizeOutput(user, ctx),
+            });
+        }
+
+        return ctx.send({
+            nextAuthFactor: authFactors.nextAuthFactor,
             user: await sanitizeOutput(user, ctx),
         });
     },

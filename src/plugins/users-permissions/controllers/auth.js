@@ -7,14 +7,20 @@ const {
     validateCallbackBody,
     validateRegisterBody,
     validateSendEmailConfirmationBody,
+    validateForgotPasswordBody,
+    validateResetPasswordBody,
+    validateEmailConfirmationBody,
+    validateChangePasswordBody,
 } = require('@strapi/plugin-users-permissions/server/controllers/validation/auth');
 const utils = require('@strapi/utils');
-const { sanitize } = utils;
+const crypto = require('crypto');
+const { getAbsoluteAdminUrl, getAbsoluteServerUrl, sanitize } = utils;
+const { getAuthFactorsParams } = require('../utils');
 
 const emailRegExp =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
-const sanitizeUser = (user, ctx) => {
+const sanitizeOutput = (user, ctx) => {
     const { auth } = ctx.state;
     const userSchema = strapi.getModel('plugin::users-permissions.user');
 
@@ -74,9 +80,18 @@ module.exports = {
                 return ctx.badRequest('Your account has been blocked by an administrator');
             }
 
+            const authFactors = getAuthFactorsParams('callback');
+
+            if (authFactors.isLast) {
+                return ctx.send({
+                    jwt: getService('jwt').issue({ id: user.id }),
+                    user: await sanitizeOutput(user, ctx),
+                });
+            }
+
             return ctx.send({
-                jwt: getService('jwt').issue({ id: user.id }),
-                user: await sanitizeUser(user, ctx),
+                nextAuthFactor: authFactors.nextAuthFactor,
+                user: await sanitizeOutput(user, ctx),
             });
         }
 
@@ -86,7 +101,7 @@ module.exports = {
 
             return ctx.send({
                 jwt: getService('jwt').issue({ id: user.id }),
-                user: await sanitizeUser(user, ctx),
+                user: await sanitizeOutput(user, ctx),
             });
         } catch (error) {
             return ctx.badRequest(error.message);
@@ -164,7 +179,7 @@ module.exports = {
             ...query,
         });
 
-        const sanitizedUser = await sanitizeUser(user, ctx);
+        const sanitizedUser = await sanitizeOutput(user, ctx);
 
         if (settings.email_confirmation) {
             try {
@@ -207,14 +222,25 @@ module.exports = {
 
         await userService.edit(user.id, { confirmed: true, confirmationToken: null });
 
-        ctx.send({
-            jwt: jwtService.issue({ id: user.id }),
-            user: await sanitizeUser(user, ctx),
+        const authFactors = getAuthFactorsParams('emailConfirmation');
+
+        if (authFactors.isLast) {
+            return ctx.send({
+                jwt: getService('jwt').issue({ id: user.id }),
+                user: await sanitizeOutput(user, ctx),
+            });
+        }
+
+        return ctx.send({
+            nextAuthFactor: authFactors.nextAuthFactor,
+            user: await sanitizeOutput(user, ctx),
         });
     },
 
     async sendEmailConfirmation(ctx) {
-        const params = _.assign(ctx.request.body);
+        const { data } = parseBody(ctx);
+
+        const params = data;
 
         await validateSendEmailConfirmationBody(params);
 
@@ -266,6 +292,91 @@ module.exports = {
             console.log(err);
             return ctx.badRequest(err.message);
         }
+    },
+
+    async forgotPassword(ctx) {
+        const { data } = parseBody(ctx);
+        await validateForgotPasswordBody(data);
+        const { email } = data;
+
+        const pluginStore = await strapi.store({ type: 'plugin', name: 'users-permissions' });
+
+        const emailSettings = await pluginStore.get({ key: 'email' });
+        const advancedSettings = await pluginStore.get({ key: 'advanced' });
+
+        // Find the user by email.
+        const user = await strapi
+            .query('plugin::users-permissions.user')
+            .findOne({ where: { email: email.toLowerCase() } });
+
+        if (!user || user.blocked) {
+            return ctx.send({ ok: true });
+        }
+
+        // Generate random token.
+        const userInfo = await sanitizeOutput(user, ctx);
+
+        const resetPasswordToken = crypto.randomBytes(64).toString('hex');
+
+        const resetPasswordSettings = _.get(emailSettings, 'reset_password.options', {});
+        const emailBody = await getService('users-permissions').template(resetPasswordSettings.message, {
+            URL: advancedSettings.email_reset_password,
+            SERVER_URL: getAbsoluteServerUrl(strapi.config),
+            ADMIN_URL: getAbsoluteAdminUrl(strapi.config),
+            USER: userInfo,
+            TOKEN: resetPasswordToken,
+        });
+
+        const emailObject = await getService('users-permissions').template(resetPasswordSettings.object, {
+            USER: userInfo,
+        });
+
+        const emailToSend = {
+            to: user.email,
+            from:
+                resetPasswordSettings.from.email || resetPasswordSettings.from.name
+                    ? `${resetPasswordSettings.from.name} <${resetPasswordSettings.from.email}>`
+                    : undefined,
+            replyTo: resetPasswordSettings.response_email,
+            subject: emailObject,
+            text: emailBody,
+            html: emailBody,
+        };
+
+        // NOTE: Update the user before sending the email so an Admin can generate the link if the email fails
+        await getService('user').edit(user.id, { resetPasswordToken });
+
+        // Send an email to the user.
+        await strapi.plugin('email').service('email').send(emailToSend);
+
+        ctx.send({ ok: true });
+    },
+
+    async resetPassword(ctx) {
+        const { data } = parseBody(ctx);
+
+        await validateResetPasswordBody(data);
+
+        const { password, passwordConfirmation, code } = data;
+
+        if (password !== passwordConfirmation) {
+            return ctx.badRequest('Passwords do not match');
+        }
+
+        const user = await strapi
+            .query('plugin::users-permissions.user')
+            .findOne({ where: { resetPasswordToken: code } });
+
+        if (!user) {
+            return ctx.badRequest('Incorrect code provided');
+        }
+
+        await getService('user').edit(user.id, {
+            resetPasswordToken: null,
+            password,
+        });
+
+        ctx.send({ ok: true });
     },
 
     /**
