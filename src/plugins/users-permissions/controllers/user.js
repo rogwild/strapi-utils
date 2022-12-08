@@ -52,7 +52,7 @@ module.exports = {
         const { id } = ctx.params;
         const user = await strapi.entityService.findOne('plugin::users-permissions.user', id);
 
-        if (user.is_otp_enabled) {
+        if (user.is_otp_confirmation_enabled) {
             return ctx.badRequest('Delete previous OTP before adding new');
         }
 
@@ -73,7 +73,7 @@ module.exports = {
         const entity = await strapi.entityService.update('plugin::users-permissions.user', id, {
             data: {
                 otp_secret: data.otp_secret,
-                is_otp_enabled: true,
+                is_otp_confirmation_enabled: true,
             },
             files,
         });
@@ -91,7 +91,7 @@ module.exports = {
         const jwtService = getService('jwt');
 
         const user = await userService.fetch(id);
-        if (!user.is_otp_enabled) {
+        if (!user.is_otp_confirmation_enabled) {
             return ctx.badRequest('2FA is not active');
         }
 
@@ -110,7 +110,7 @@ module.exports = {
             user: await sanitizeOutput(user, ctx),
         });
 
-        const authFactors = getAuthFactorsParams('checkOtp');
+        const authFactors = getAuthFactorsParams('user.checkOtp', user);
 
         if (authFactors.isLast) {
             return ctx.send({
@@ -132,7 +132,7 @@ module.exports = {
         const userService = getService('user');
 
         const user = await userService.fetch(id);
-        if (!user.is_otp_enabled) {
+        if (!user.is_otp_confirmation_enabled) {
             return ctx.badRequest('2FA is not active');
         }
 
@@ -149,7 +149,7 @@ module.exports = {
         const entity = await strapi.entityService.update('plugin::users-permissions.user', id, {
             data: {
                 otp_secret: '',
-                is_otp_enabled: false,
+                is_otp_confirmation_enabled: false,
             },
         });
 

@@ -80,7 +80,7 @@ module.exports = {
                 return ctx.badRequest('Your account has been blocked by an administrator');
             }
 
-            const authFactors = getAuthFactorsParams('callback');
+            const authFactors = getAuthFactorsParams('auth.callback', user);
 
             if (authFactors.isLast) {
                 return ctx.send({
@@ -222,7 +222,7 @@ module.exports = {
 
         await userService.edit(user.id, { confirmed: true, confirmationToken: null });
 
-        const authFactors = getAuthFactorsParams('emailConfirmation');
+        const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
 
         if (authFactors.isLast) {
             return ctx.send({
