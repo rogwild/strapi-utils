@@ -68,8 +68,6 @@ module.exports = {
             }
         }
 
-        console.log('after throw');
-
         const entity = await strapi.entityService.update('plugin::users-permissions.user', id, {
             data: {
                 otp_secret: data.otp_secret,

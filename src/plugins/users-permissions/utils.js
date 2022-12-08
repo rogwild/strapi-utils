@@ -1,6 +1,4 @@
 function getAuthFactorsParams(name, user) {
-    console.log('🚀 ~ getAuthFactorsParams ~ user', user);
-
     const authFactors = strapi.plugins['users-permissions'].config('authFactors');
     let isLast = authFactors.indexOf(name) === authFactors.length - 1;
     let nextAuthFactor = isLast ? undefined : authFactors[authFactors.indexOf(name) + 1];
