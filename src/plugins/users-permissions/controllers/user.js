@@ -83,7 +83,7 @@ module.exports = {
 
     async checkOtp(ctx) {
         const { id } = ctx.params;
-        const { code } = ctx.query;
+        const { code, next_auth_key } = ctx.query;
 
         const userService = getService('user');
         const jwtService = getService('jwt');
@@ -91,6 +91,10 @@ module.exports = {
         const user = await userService.fetch(id);
         if (!user.is_otp_confirmation_enabled) {
             return ctx.badRequest('2FA is not active');
+        }
+
+        if (user.next_auth_key !== next_auth_key) {
+            return ctx.badRequest('Previous auth steps were skipped');
         }
 
         const isValid = speakeasy.totp.verify({
