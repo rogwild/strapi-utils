@@ -83,7 +83,8 @@ module.exports = {
 
     async checkOtp(ctx) {
         const { id } = ctx.params;
-        const { code, next_auth_key } = ctx.query;
+        const { code } = ctx.query;
+        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
         const userService = getService('user');
         const jwtService = getService('jwt');
@@ -93,7 +94,12 @@ module.exports = {
             return ctx.badRequest('2FA is not active');
         }
 
-        if (user.next_auth_key !== next_auth_key) {
+        const authFactors = getAuthFactorsParams('user.checkOtp', user);
+
+        if (
+            user.next_auth_factor_key !== next_auth_factor_key ||
+            (!next_auth_factor_key && !authFactors.isFirst)
+        ) {
             return ctx.badRequest('Previous auth steps were skipped');
         }
 
@@ -107,12 +113,11 @@ module.exports = {
             return ctx.badRequest('Invalid code');
         }
 
-        ctx.send({
-            jwt: jwtService.issue({ id: user.id }),
-            user: await sanitizeOutput(user, ctx),
+        await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                next_auth_factor_key: null,
+            },
         });
-
-        const authFactors = getAuthFactorsParams('user.checkOtp', user);
 
         if (authFactors.isLast) {
             return ctx.send({
@@ -121,9 +126,20 @@ module.exports = {
             });
         }
 
+        const nextAuthFactorKey = getService('jwt').issue({
+            nextAuthFactor: authFactors.nextAuthFactor,
+        });
+
+        const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                next_auth_factor_key: nextAuthFactorKey,
+            },
+        });
+
         return ctx.send({
             nextAuthFactor: authFactors.nextAuthFactor,
-            user: await sanitizeOutput(user, ctx),
+            nextAuthFactorKey: nextAuthFactorKey,
+            user: await sanitizeOutput(entity, ctx),
         });
     },
 

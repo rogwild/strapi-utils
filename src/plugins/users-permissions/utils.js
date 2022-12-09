@@ -1,6 +1,7 @@
 function getAuthFactorsParams(name, user) {
     const authFactors = strapi.plugins['users-permissions'].config('authFactors');
     let isLast = authFactors.indexOf(name) === authFactors.length - 1;
+    const isFirst = authFactors.indexOf(name) === 0;
     let nextAuthFactor = isLast ? undefined : authFactors[authFactors.indexOf(name) + 1];
 
     if (nextAuthFactor === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
@@ -17,6 +18,7 @@ function getAuthFactorsParams(name, user) {
 
     return {
         isLast,
+        isFirst,
         nextAuthFactor,
     };
 }

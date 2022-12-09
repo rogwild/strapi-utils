@@ -211,7 +211,8 @@ module.exports = {
     },
 
     async emailConfirmation(ctx) {
-        const { code: confirmationToken, email, next_auth_key } = ctx.query;
+        const { code: confirmationToken, email } = ctx.query;
+        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
         const userService = getService('user');
         const jwtService = getService('jwt');
@@ -231,13 +232,22 @@ module.exports = {
             return ctx.badRequest('Token is invalid');
         }
 
-        if (user.next_auth_key !== next_auth_key) {
+        const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
+
+        if (
+            user.next_auth_factor_key !== next_auth_factor_key ||
+            (!next_auth_factor_key && !authFactors.isFirst)
+        ) {
             return ctx.badRequest('Previous auth steps were skipped');
         }
 
-        await userService.edit(user.id, { confirmed: true, confirmationToken: null });
-
-        const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
+        await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                confirmed: true,
+                confirmationToken: null,
+                next_auth_factor_key: null,
+            },
+        });
 
         if (authFactors.isLast) {
             return ctx.send({
@@ -246,9 +256,20 @@ module.exports = {
             });
         }
 
+        const nextAuthFactorKey = getService('jwt').issue({
+            nextAuthFactor: authFactors.nextAuthFactor,
+        });
+
+        const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                next_auth_factor_key: nextAuthFactorKey,
+            },
+        });
+
         return ctx.send({
             nextAuthFactor: authFactors.nextAuthFactor,
-            user: await sanitizeOutput(user, ctx),
+            nextAuthFactorKey: nextAuthFactorKey,
+            user: await sanitizeOutput(entity, ctx),
         });
     },
 
