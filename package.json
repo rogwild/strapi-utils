@@ -16,8 +16,7 @@
         "format:write": "prettier --write .",
         "lint:check": "eslint .",
         "lint:fix": "eslint --fix .",
-        "develop": "nodemon index.js",
-        "build": "rollup -c"
+        "develop": "nodemon index.js"
     },
     "dependencies": {
         "@rollup/plugin-babel": "^6.0.3",
