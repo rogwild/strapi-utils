@@ -232,6 +232,22 @@ module.exports = {
             return ctx.badRequest('Token is invalid');
         }
 
+        if (user.id === ctx.state?.user?.id) {
+            await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+                data: {
+                    confirmed: true,
+                    confirmationToken: null,
+                    next_auth_factor_key: null,
+                },
+            });
+
+            return ctx.send({
+                data: {
+                    emailConfirmed: true,
+                },
+            });
+        }
+
         const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
 
         if (
