@@ -1,6 +1,6 @@
 {
     "name": "@rogwild/strapi-utils",
-    "version": "3.3.0",
+    "version": "3.3.1",
     "author": "rogwild",
     "license": "ISC",
     "description": "Additional fuctions for Strapi 4",
