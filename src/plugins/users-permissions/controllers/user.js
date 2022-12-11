@@ -203,7 +203,7 @@ module.exports = {
         }
 
         if (username) {
-            const usersWithSameUsername = await strapi.entityService.findMany(
+            const [usersWithSameUsername] = await strapi.entityService.findMany(
                 'plugin::users-permissions.user',
                 {
                     filters: {
@@ -212,7 +212,7 @@ module.exports = {
                 }
             );
 
-            if (usersWithSameUsername.length && usersWithSameUsername[0].id !== id) {
+            if (usersWithSameUsername && usersWithSameUsername.id !== parseInt(id)) {
                 return ctx.badRequest('Username already taken');
             }
         }
