@@ -431,6 +431,35 @@ module.exports = {
         ctx.send({ ok: true });
     },
 
+    async changePassword(ctx) {
+        if (!ctx.state.user) {
+            return ctx.badRequest('You must be authenticated to reset your password');
+        }
+
+        const { data } = parseBody(ctx);
+
+        const { currentPassword, password } = await validateChangePasswordBody(data);
+
+        const user = await strapi.entityService.findOne('plugin::users-permissions.user', ctx.state.user.id);
+
+        const validPassword = await getService('user').validatePassword(currentPassword, user.password);
+
+        if (!validPassword) {
+            return ctx.badRequest('The provided current password is invalid');
+        }
+
+        if (currentPassword === password) {
+            return ctx.badRequest('Your new password must be different than your current password');
+        }
+
+        await getService('user').edit(user.id, { password });
+
+        ctx.send({
+            jwt: getService('jwt').issue({ id: user.id }),
+            user: await sanitizeOutput(user, ctx),
+        });
+    },
+
     /**
      * @todo
      */

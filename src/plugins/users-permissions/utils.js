@@ -8,6 +8,10 @@ function getAuthFactorsParams(name, user) {
         return getAuthFactorsParams('user.checkOtp', user);
     }
 
+    if (nextAuthFactor === 'auth.emailConfirmation' && !user.is_email_confirmation_enabled) {
+        return getAuthFactorsParams('auth.emailConfirmation', user);
+    }
+
     if (
         nextAuthFactor === 'auth.phoneConfirmation' &&
         user.is_phone_confirmation_enabled &&
