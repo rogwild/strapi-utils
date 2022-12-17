@@ -1,6 +1,7 @@
 const urlJoin = require('url-join');
 const { getAbsoluteServerUrl, sanitize } = require('@strapi/utils');
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
+const ethers = require('ethers');
 
 const sanitizeUser = (user, ctx) => {
     const { auth } = ctx.state;
@@ -123,5 +124,16 @@ module.exports = {
             phoneNumber: user.phone_number,
             phoneNumberConfirmationToken,
         });
+    },
+
+    checkWeb3Signature({ account, message, signature }) {
+        let recoveredAddress;
+        try {
+            recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        } catch (error) {
+            console.log('checkWeb3Signature', error);
+        }
+
+        return recoveredAddress && recoveredAddress.toLowerCase() === account;
     },
 };
