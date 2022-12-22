@@ -87,7 +87,6 @@ module.exports = {
         const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
         const userService = getService('user');
-        const jwtService = getService('jwt');
 
         const user = await userService.fetch(id);
         if (!user.is_otp_confirmation_enabled) {
