@@ -463,10 +463,95 @@ module.exports = {
     /**
      * @todo
      */
-    async sendPhoneConfirmation(ctx) {},
+    async sendPhoneConfirmation(ctx) {
+        const { data } = parseBody(ctx);
+
+        const { phone } = data;
+
+        if (!phone) {
+            return ctx.badRequest('Pass phone for sending code');
+        }
+
+        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+            filters: {
+                phone_number: phone,
+            },
+        });
+
+        if (!user) {
+            return ctx.badRequest('Wrong email');
+        }
+
+        await strapi.service('plugin::users-permissions.user').sendPhoneConfirmation({ user, ctx });
+
+        return ctx.send({
+            data: {
+                phone,
+                sent: true,
+            },
+        });
+    },
 
     /**
      * @todo
      */
-    async phoneConfirmation(ctx) {},
+    async phoneConfirmation(ctx) {
+        const { code: confirmationToken } = ctx.query;
+        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+
+        // const userService = getService('user');
+        const jwtService = getService('jwt');
+
+        if (!confirmationToken) {
+            return ctx.badRequest('token.invalid');
+        }
+
+        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+            filters: {
+                phoneNumberConfirmationToken: confirmationToken,
+            },
+        });
+
+        if (!user) {
+            return ctx.badRequest('token.invalid');
+        }
+
+        const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
+
+        if (
+            user.next_auth_factor_key !== next_auth_factor_key ||
+            (!next_auth_factor_key && !authFactors.isFirst)
+        ) {
+            return ctx.badRequest('Previous auth steps were skipped');
+        }
+
+        await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                phone_number_confirmed: true,
+                phoneNumberConfirmationToken: null,
+            },
+        });
+
+        if (authFactors.isLast) {
+            return ctx.send({
+                jwt: getService('jwt').issue({ id: user.id }),
+                user: await sanitizeOutput(user, ctx),
+            });
+        }
+
+        const nextAuthFactorKey = getService('jwt').issue({
+            nextAuthFactor: authFactors.nextAuthFactor,
+        });
+
+        const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: {
+                next_auth_factor_key: nextAuthFactorKey,
+            },
+        });
+
+        ctx.send({
+            jwt: jwtService.issue({ id: user.id }),
+            user: await sanitizeOutput(entity, ctx),
+        });
+    },
 };

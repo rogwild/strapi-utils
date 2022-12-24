@@ -2,6 +2,7 @@ const urlJoin = require('url-join');
 const { getAbsoluteServerUrl, sanitize } = require('@strapi/utils');
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 const ethers = require('ethers');
+const { default: axios } = require('axios');
 
 const sanitizeUser = (user, ctx) => {
     const { auth } = ctx.state;
@@ -107,11 +108,8 @@ module.exports = {
     },
 
     async sendPhoneConfirmation({ user, ctx }) {
-        const userService = getService('user');
-        if (typeof userService.sendPhoneConfirmationCode !== 'function') {
-            return ctx.badRequest('userService.sendPhoneConfirmationCode method not defined');
-        }
-
+        const appName = strapi.plugins['users-permissions'].config('appName');
+        const smsConfig = strapi.plugins['users-permissions'].config('sms');
         const phoneNumberConfirmationToken = `${Math.floor(100000 + Math.random() * 900000)}`;
 
         await strapi.entityService.update('plugin::users-permissions.user', user.id, {
@@ -120,10 +118,17 @@ module.exports = {
 
         console.log('send sms code:', phoneNumberConfirmationToken);
 
-        await userService.sendPhoneConfirmationCode({
-            phoneNumber: user.phone_number,
-            phoneNumberConfirmationToken,
-        });
+        if (process.env.NODE_ENV === 'production') {
+            await axios({
+                url: `https://api.prostor-sms.ru/messages/v2/send/?phone=${
+                    user.phone_number
+                }&text=${encodeURI(`Code for ${appName}: ${phoneNumberConfirmationToken}`)}&login=${
+                    smsConfig.login
+                }&password=${smsConfig.password}`,
+            }).catch((error) => {
+                console.log('🚀 ~ sendPhoneConfirmation ~ error', error);
+            });
+        }
     },
 
     checkWeb3Signature({ account, message, signature }) {

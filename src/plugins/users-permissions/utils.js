@@ -14,8 +14,8 @@ function getAuthFactorsParams(name, user) {
 
     if (
         nextAuthFactor === 'auth.phoneConfirmation' &&
-        user.is_phone_confirmation_enabled &&
-        (!user.phone || user.phone === '')
+        user.is_phone_number_confirmation_enabled &&
+        (!user.phone_numer || user.phone_numer === '')
     ) {
         return getAuthFactorsParams('auth.phoneConfirmation', user);
     }
