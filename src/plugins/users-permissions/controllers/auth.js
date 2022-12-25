@@ -137,6 +137,10 @@ module.exports = {
         delete data.resetPasswordToken;
         data.provider = 'local';
 
+        if (!data.username) {
+            data.username = data.email;
+        }
+
         await validateRegisterBody(data);
 
         const role = await strapi
