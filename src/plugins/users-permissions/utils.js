@@ -2,6 +2,8 @@ function getAuthFactorsParams(name, user) {
     const authFactors = strapi.plugins['users-permissions'].config('authFactors');
     const { isFirst, factorIndex, isLast } = getAuthFactorIndex(name, authFactors);
 
+    console.log('🚀 ~ getAuthFactorsParams ~ authFactors', authFactors);
+
     let nextAuthFactor = isLast ? undefined : authFactors[factorIndex + 1];
 
     if (nextAuthFactor === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
@@ -14,8 +16,8 @@ function getAuthFactorsParams(name, user) {
 
     if (
         nextAuthFactor === 'auth.phoneConfirmation' &&
-        user.is_phone_number_confirmation_enabled &&
-        (!user.phone_numer || user.phone_numer === '')
+        user.is_phone_confirmation_enabled &&
+        (!user.phone || user.phone === '')
     ) {
         return getAuthFactorsParams('auth.phoneConfirmation', user);
     }

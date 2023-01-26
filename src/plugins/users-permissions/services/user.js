@@ -23,11 +23,7 @@ module.exports = {
         const userService = getService('user');
 
         // Проблемы с отправкой кода
-        if (
-            user.phone_number_confirmed &&
-            user.phone_number &&
-            typeof userService.sendPhoneConfirmation !== 'undefined'
-        ) {
+        if (user.phone_confirmed && user.phone && typeof userService.sendPhoneConfirmation !== 'undefined') {
             await userService.sendPhoneConfirmation(user);
             return ctx.send({
                 nextAuthFactor: 'phone',
@@ -110,21 +106,19 @@ module.exports = {
     async sendPhoneConfirmation({ user, ctx }) {
         const appName = strapi.plugins['users-permissions'].config('appName');
         const smsConfig = strapi.plugins['users-permissions'].config('sms');
-        const phoneNumberConfirmationToken = `${Math.floor(100000 + Math.random() * 900000)}`;
+        const phone_confirmation_token = `${Math.floor(100000 + Math.random() * 900000)}`;
 
         await strapi.entityService.update('plugin::users-permissions.user', user.id, {
-            data: { phoneNumberConfirmationToken },
+            data: { phone_confirmation_token },
         });
 
-        console.log('send sms code:', phoneNumberConfirmationToken);
+        console.log('send sms code:', phone_confirmation_token);
 
         if (process.env.NODE_ENV === 'production') {
             await axios({
-                url: `https://api.prostor-sms.ru/messages/v2/send/?phone=${
-                    user.phone_number
-                }&text=${encodeURI(`Code for ${appName}: ${phoneNumberConfirmationToken}`)}&login=${
-                    smsConfig.login
-                }&password=${smsConfig.password}`,
+                url: `https://api.prostor-sms.ru/messages/v2/send/?phone=${user.phone}&text=${encodeURI(
+                    `Code for ${appName}: ${phone_confirmation_token}`
+                )}&login=${smsConfig.login}&password=${smsConfig.password}`,
             }).catch((error) => {
                 console.log('🚀 ~ sendPhoneConfirmation ~ error', error);
             });

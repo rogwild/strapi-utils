@@ -464,9 +464,6 @@ module.exports = {
         });
     },
 
-    /**
-     * @todo
-     */
     async sendPhoneConfirmation(ctx) {
         const { data } = parseBody(ctx);
 
@@ -478,7 +475,7 @@ module.exports = {
 
         const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
             filters: {
-                phone_number: phone,
+                phone: phone,
             },
         });
 
@@ -496,9 +493,6 @@ module.exports = {
         });
     },
 
-    /**
-     * @todo
-     */
     async phoneConfirmation(ctx) {
         const { code: confirmationToken } = ctx.query;
         const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
@@ -512,7 +506,7 @@ module.exports = {
 
         const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
             filters: {
-                phoneNumberConfirmationToken: confirmationToken,
+                phone_confirmation_token: confirmationToken,
             },
         });
 
@@ -520,7 +514,7 @@ module.exports = {
             return ctx.badRequest('token.invalid');
         }
 
-        const authFactors = getAuthFactorsParams('auth.emailConfirmation', user);
+        const authFactors = getAuthFactorsParams('auth.phoneConfirmation', user);
 
         if (
             user.next_auth_factor_key !== next_auth_factor_key ||
@@ -531,8 +525,8 @@ module.exports = {
 
         await strapi.entityService.update('plugin::users-permissions.user', user.id, {
             data: {
-                phone_number_confirmed: true,
-                phoneNumberConfirmationToken: null,
+                phone_confirmed: true,
+                phone_confirmation_token: null,
             },
         });
 
@@ -553,8 +547,9 @@ module.exports = {
             },
         });
 
-        ctx.send({
-            jwt: jwtService.issue({ id: user.id }),
+        return ctx.send({
+            nextAuthFactor: authFactors.nextAuthFactor,
+            nextAuthFactorKey: nextAuthFactorKey,
             user: await sanitizeOutput(entity, ctx),
         });
     },
