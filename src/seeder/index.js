@@ -36,6 +36,8 @@ async function modelSeeder(apiPath, modelName) {
         return;
     }
 
+    console.log('🚀 ~ modelSeeder ~ seeding', modelName);
+
     const seedAsJson = JSON.parse(seed);
     const schemaAsJson = JSON.parse(schema);
 

@@ -8,6 +8,7 @@ const parseBody = require('./parse-body');
 const customizeCoreStrapi = require('./customize-core-strapi');
 const lifecycleActions = require('./lifecycle-actions');
 const middlewares = require('./middlewares');
+const getDeepPopulate = require('./get-deep-populate');
 
 module.exports = {
     setPermissions,
@@ -17,6 +18,7 @@ module.exports = {
     removeEmptyIds,
     parseBody,
     customizeCoreStrapi,
+    getDeepPopulate,
     ...transformers,
     ...lifecycleActions,
     ...middlewares,
