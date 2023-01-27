@@ -51,6 +51,7 @@ async function modelSeeder(apiPath, modelName) {
         if (Array.isArray(seedAsJson)) {
             for (const seedItem of seedAsJson) {
                 const modified = await findFilesInSeedData({ data: seedItem, schema: schemaAsJson, apiPath });
+                console.log('🚀 ~ modelSeeder ~ modified', modified);
 
                 await strapi.entityService.create(`api::${modelName}.${modelName}`, {
                     data: modified,
@@ -58,6 +59,7 @@ async function modelSeeder(apiPath, modelName) {
             }
         } else {
             const modified = await findFilesInSeedData({ data: seedAsJson, schema: schemaAsJson, apiPath });
+            console.log('🚀 ~ modelSeeder ~ modified', modified);
 
             await strapi.entityService.create(`api::${modelName}.${modelName}`, {
                 data: modified,
@@ -67,7 +69,7 @@ async function modelSeeder(apiPath, modelName) {
 }
 
 async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
-    if (typeof data === 'object') {
+    if (data && typeof data === 'object') {
         if (Array.isArray(data)) {
             let resData = [...data];
 
@@ -119,7 +121,14 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
                 const currentModelNames = [schema.info.singularName, schema.info.pluralName];
                 const attributeType = schema.attributes[dataKey]?.type;
 
-                if (dataKey === 'id') {
+                if (['id'].includes(dataKey)) {
+                    continue;
+                } else if (['createdBy', 'updatedBy'].includes(dataKey)) {
+                    resData = {
+                        ...resData,
+                        [dataKey]: data[dataKey]?.id || null,
+                    };
+
                     continue;
                 } else if (dataKey === 'publishedAt' && data[dataKey] && data[dataKey] !== '') {
                     resData = {
@@ -133,11 +142,33 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
 
                     const relationModelName = relationModel.split('::')[1].split('.')[0];
 
-                    const filters = data[dataKey];
-                    delete filters.id;
-                    delete filters.createdAt;
-                    delete filters.publishedAt;
-                    delete filters.updatedBy;
+                    const filters = {};
+
+                    if (Array.isArray(data[dataKey])) {
+                        for (const key of data[dataKey]) {
+                            if (key) {
+                                console.log('🚀 ~ findFilesInSeedData ~ key', key);
+                            }
+                        }
+                    } else {
+                        for (const key of Object.keys(data[dataKey])) {
+                            if (
+                                ![
+                                    'id',
+                                    'createdAt',
+                                    'publishedAt',
+                                    'updatedBy',
+                                    'updatedAt',
+                                    'publishedAt',
+                                ].includes(key) &&
+                                data[dataKey][key]
+                            ) {
+                                filters[key] = data[dataKey][key];
+                            }
+                        }
+                    }
+
+                    console.log('🚀 ~ findFilesInSeedData ~ filters', relationModel, filters);
 
                     let [entity] = await strapi.entityService.findMany(relationModel, {
                         filters,
@@ -159,7 +190,7 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
                     if (entity) {
                         resData = {
                             ...resData,
-                            [dataKey]: entity,
+                            [dataKey]: entity.id,
                         };
                     } else {
                         resData = {
