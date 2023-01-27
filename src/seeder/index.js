@@ -145,9 +145,14 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
                     const filters = {};
 
                     if (Array.isArray(data[dataKey])) {
-                        for (const key of data[dataKey]) {
-                            if (key) {
-                                console.log('🚀 ~ findFilesInSeedData ~ key', key);
+                        filters['$or'] = [];
+
+                        for (const relationEntity of data[dataKey]) {
+                            if (relationEntity) {
+                                const passF = fillFilters(relationEntity);
+
+                                filters['$or'].push(passF);
+                                console.log('🚀 ~ findFilesInSeedData ~ key', relationEntity);
                             }
                         }
                     } else {
@@ -170,6 +175,7 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
 
                     console.log('🚀 ~ findFilesInSeedData ~ filters', relationModel, filters);
 
+                    // Тут может быть несколько записей, поэтому надо проверять и проставлять id модели по-другому
                     let [entity] = await strapi.entityService.findMany(relationModel, {
                         filters,
                     });
@@ -225,3 +231,18 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
 }
 
 module.exports = seeder;
+
+function fillFilters(obj) {
+    const filters = {};
+
+    for (const key of Object.keys(obj)) {
+        if (
+            !['id', 'createdAt', 'publishedAt', 'updatedBy', 'updatedAt', 'publishedAt'].includes(key) &&
+            obj[key]
+        ) {
+            filters[key] = obj[key];
+        }
+    }
+
+    return filters;
+}
