@@ -4,6 +4,7 @@ const utils = require('./api');
 const providers = require('./providers');
 const plugins = require('./plugins');
 const middlewares = require('./middlewares');
+const seeder = require('./seeder');
 
 module.exports = {
     utils,
@@ -12,4 +13,5 @@ module.exports = {
     providers,
     plugins,
     middlewares,
+    seeder,
 };
