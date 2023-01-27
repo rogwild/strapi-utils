@@ -51,10 +51,19 @@ module.exports = {
         const userPermissionService = getService('users-permissions');
         const pluginStore = await strapi.store({ type: 'plugin', name: 'users-permissions' });
         const userSchema = strapi.getModel('plugin::users-permissions.user');
+        const appName = strapi.plugins['email'].config('appName');
 
-        const settings = await pluginStore
-            .get({ key: 'email' })
-            .then((storeEmail) => storeEmail['email_confirmation'].options);
+        const settings = await pluginStore.get({ key: 'email' }).then((storeEmail) => {
+            const emailConfig = strapi.config.get('plugin.email');
+
+            const settings = { ...storeEmail['email_confirmation'].options };
+            if (settings?.from?.email && emailConfig?.settings?.defaultFrom) {
+                settings.from.email = emailConfig.settings.defaultFrom;
+                settings.from.name = appName || 'Backend';
+            }
+
+            return settings;
+        });
 
         // Sanitize the template's user information
         const sanitizedUserInfo = await sanitize.sanitizers.defaultSanitizeOutput(userSchema, user);

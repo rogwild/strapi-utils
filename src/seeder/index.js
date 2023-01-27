@@ -14,14 +14,16 @@ const path = require('path');
  */
 async function seeder(apiPath) {
     const apiDirs = await fs.readdir(apiPath);
+    const revApiDirs = apiDirs.reverse();
+
     if (apiDirs.length) {
-        for (const modelName of apiDirs) {
-            await modelSeeder(apiPath, modelName);
+        for (const modelName of revApiDirs) {
+            await modelSeeder({ apiPath, modelName });
         }
     }
 }
 
-async function modelSeeder(apiPath, modelName) {
+async function modelSeeder({ apiPath, modelName, callerName }) {
     const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seed.json`);
     const seed = await fs.readFile(pathToSeed, 'utf8').catch((error) => {
         // console.log(`🚀 ~ seed ~ error`, error);
@@ -50,16 +52,24 @@ async function modelSeeder(apiPath, modelName) {
     if (!modelEntities || modelEntities?.length === 0) {
         if (Array.isArray(seedAsJson)) {
             for (const seedItem of seedAsJson) {
-                const modified = await findFilesInSeedData({ data: seedItem, schema: schemaAsJson, apiPath });
-                console.log('🚀 ~ modelSeeder ~ modified', modified);
+                const modified = await findFilesInSeedData({
+                    data: seedItem,
+                    schema: schemaAsJson,
+                    apiPath,
+                    callerName,
+                });
 
                 await strapi.entityService.create(`api::${modelName}.${modelName}`, {
                     data: modified,
                 });
             }
         } else {
-            const modified = await findFilesInSeedData({ data: seedAsJson, schema: schemaAsJson, apiPath });
-            console.log('🚀 ~ modelSeeder ~ modified', modified);
+            const modified = await findFilesInSeedData({
+                data: seedAsJson,
+                schema: schemaAsJson,
+                apiPath,
+                callerName,
+            });
 
             await strapi.entityService.create(`api::${modelName}.${modelName}`, {
                 data: modified,
@@ -68,14 +78,14 @@ async function modelSeeder(apiPath, modelName) {
     }
 }
 
-async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
+async function findFilesInSeedData({ data, path = '', schema, apiPath, callerName }) {
     if (data && typeof data === 'object') {
         if (Array.isArray(data)) {
             let resData = [...data];
 
             for (const [index, entry] of data.entries()) {
                 const entryPath = `${path}[${index}]`;
-                const resEntry = await findFilesInSeedData({ data: entry, path: entryPath, schema });
+                const resEntry = await findFilesInSeedData({ data: entry, path: entryPath, schema, apiPath });
 
                 resData = R.modifyPath([index], () => resEntry, resData);
             }
@@ -142,20 +152,24 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
 
                     const relationModelName = relationModel.split('::')[1].split('.')[0];
 
-                    const filters = {};
+                    let filters;
 
                     if (Array.isArray(data[dataKey])) {
-                        filters['$or'] = [];
+                        if (data[dataKey].length) {
+                            filters = {
+                                $or: [],
+                            };
 
-                        for (const relationEntity of data[dataKey]) {
-                            if (relationEntity) {
-                                const passF = fillFilters(relationEntity);
+                            for (const relationEntity of data[dataKey]) {
+                                if (relationEntity) {
+                                    const passF = fillFilters(relationEntity);
 
-                                filters['$or'].push(passF);
-                                console.log('🚀 ~ findFilesInSeedData ~ key', relationEntity);
+                                    filters['$or'].push(passF);
+                                }
                             }
                         }
-                    } else {
+                    } else if (data[dataKey]) {
+                        filters = {};
                         for (const key of Object.keys(data[dataKey])) {
                             if (
                                 ![
@@ -173,31 +187,57 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
                         }
                     }
 
-                    console.log('🚀 ~ findFilesInSeedData ~ filters', relationModel, filters);
+                    // console.log('🚀 ~ findFilesInSeedData ~ filters', relationModel, filters);
 
-                    // Тут может быть несколько записей, поэтому надо проверять и проставлять id модели по-другому
-                    let [entity] = await strapi.entityService.findMany(relationModel, {
-                        filters,
-                    });
-
-                    if (!entity) {
-                        if (
-                            !schema.attributes[dataKey]?.mappedBy ||
-                            currentModelNames.includes(schema.attributes[dataKey]?.mappedBy)
-                        ) {
-                            await modelSeeder(apiPath, relationModelName);
-                        }
-
-                        [entity] = await strapi.entityService.findMany(relationModel, {
+                    let entities;
+                    if (filters) {
+                        entities = await strapi.entityService.findMany(relationModel, {
                             filters,
                         });
                     }
 
-                    if (entity) {
-                        resData = {
-                            ...resData,
-                            [dataKey]: entity.id,
-                        };
+                    if (entities !== undefined && filters) {
+                        // надо поставить блок на циклический вызов, если manyToMany
+                        if (
+                            !schema.attributes[dataKey]?.mappedBy ||
+                            currentModelNames.includes(schema.attributes[dataKey]?.mappedBy)
+                        ) {
+                            /**
+                             * For stopping cycle creation after first iteration
+                             */
+                            if (relationModelName && relationModelName !== callerName) {
+                                console.log(
+                                    '🚀 ~ findFilesInSeedData ~ callerName',
+                                    callerName,
+                                    relationModelName,
+                                    apiPath
+                                );
+
+                                await modelSeeder({
+                                    apiPath,
+                                    modelName: relationModelName,
+                                    callerName: schema.info.singularName,
+                                });
+                            }
+                        }
+
+                        entities = await strapi.entityService.findMany(relationModel, {
+                            filters,
+                        });
+                    }
+
+                    if (entities) {
+                        if (entities.length === 1) {
+                            resData = {
+                                ...resData,
+                                [dataKey]: entities[0].id,
+                            };
+                        } else {
+                            resData = {
+                                ...resData,
+                                [dataKey]: entities.map((entity) => entity.id),
+                            };
+                        }
                     } else {
                         resData = {
                             ...resData,
@@ -212,6 +252,7 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath }) {
                     data: data[dataKey],
                     path: `${path}${dataKey}`,
                     schema,
+                    apiPath,
                 });
                 const filteredResults = Array.isArray(passResults)
                     ? passResults.filter((res) => res !== undefined)
