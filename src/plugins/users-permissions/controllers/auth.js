@@ -375,6 +375,15 @@ module.exports = {
         const resetPasswordToken = crypto.randomBytes(64).toString('hex');
 
         const resetPasswordSettings = _.get(emailSettings, 'reset_password.options', {});
+
+        const appName = strapi.plugins['email'].config('appName');
+        const emailConfig = strapi.config.get('plugin.email');
+
+        if (resetPasswordSettings?.from?.email && emailConfig?.settings?.defaultFrom) {
+            resetPasswordSettings.from.email = emailConfig.settings.defaultFrom;
+            resetPasswordSettings.from.name = appName || 'Backend';
+        }
+
         const emailBody = await getService('users-permissions').template(resetPasswordSettings.message, {
             URL: advancedSettings.email_reset_password,
             SERVER_URL: getAbsoluteServerUrl(strapi.config),

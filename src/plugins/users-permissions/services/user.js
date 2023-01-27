@@ -51,9 +51,9 @@ module.exports = {
         const userPermissionService = getService('users-permissions');
         const pluginStore = await strapi.store({ type: 'plugin', name: 'users-permissions' });
         const userSchema = strapi.getModel('plugin::users-permissions.user');
-        const appName = strapi.plugins['email'].config('appName');
 
         const settings = await pluginStore.get({ key: 'email' }).then((storeEmail) => {
+            const appName = strapi.plugins['email'].config('appName');
             const emailConfig = strapi.config.get('plugin.email');
 
             const settings = { ...storeEmail['email_confirmation'].options };
