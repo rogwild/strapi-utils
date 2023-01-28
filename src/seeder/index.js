@@ -135,7 +135,7 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath, callerNam
                 } else if (['createdBy', 'updatedBy'].includes(dataKey)) {
                     resData = {
                         ...resData,
-                        [dataKey]: data[dataKey]?.id || null,
+                        [dataKey]: null,
                     };
 
                     continue;

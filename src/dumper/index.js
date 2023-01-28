@@ -15,6 +15,7 @@ const getDeepPopulate = require('../api/get-deep-populate');
  */
 async function dumper(apiPath) {
     const apiDirs = await fs.readdir(apiPath);
+
     if (apiDirs.length) {
         for (const modelName of apiDirs) {
             await modelDumper(apiPath, modelName);
