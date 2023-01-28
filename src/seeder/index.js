@@ -14,10 +14,9 @@ const path = require('path');
  */
 async function seeder(apiPath) {
     const apiDirs = await fs.readdir(apiPath);
-    const revApiDirs = apiDirs.reverse();
 
     if (apiDirs.length) {
-        for (const modelName of revApiDirs) {
+        for (const modelName of apiDirs) {
             await modelSeeder({ apiPath, modelName });
         }
     }
@@ -197,7 +196,6 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath, callerNam
                     }
 
                     if (entities !== undefined && filters) {
-                        // надо поставить блок на циклический вызов, если manyToMany
                         if (
                             !schema.attributes[dataKey]?.mappedBy ||
                             currentModelNames.includes(schema.attributes[dataKey]?.mappedBy)
@@ -206,13 +204,6 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath, callerNam
                              * For stopping cycle creation after first iteration
                              */
                             if (relationModelName && relationModelName !== callerName) {
-                                console.log(
-                                    '🚀 ~ findFilesInSeedData ~ callerName',
-                                    callerName,
-                                    relationModelName,
-                                    apiPath
-                                );
-
                                 await modelSeeder({
                                     apiPath,
                                     modelName: relationModelName,
