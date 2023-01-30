@@ -33,7 +33,7 @@ async function modelSeeder({ apiPath, modelName, callerName }) {
         // console.log(`🚀 ~ seed ~ error`, error);
     });
 
-    if (!seed || !schema) {
+    if (!seed || !schema || seed === null) {
         return;
     }
 
