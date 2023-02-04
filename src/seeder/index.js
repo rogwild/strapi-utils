@@ -22,7 +22,7 @@ async function seeder(apiPath) {
     }
 }
 
-async function modelSeeder({ apiPath, modelName, callerName }) {
+async function modelSeeder({ apiPath, modelName, callerName, passedSeed }) {
     const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seed.json`);
     const seed = await fs.readFile(pathToSeed, 'utf8').catch((error) => {
         // console.log(`🚀 ~ seed ~ error`, error);
@@ -39,7 +39,7 @@ async function modelSeeder({ apiPath, modelName, callerName }) {
 
     console.log('🚀 ~ modelSeeder ~ seeding', modelName);
 
-    const seedAsJson = JSON.parse(seed);
+    const seedAsJson = passedSeed ? passedSeed : JSON.parse(seed);
     const schemaAsJson = JSON.parse(schema);
 
     const modelEntities = await strapi.entityService.findMany(`api::${modelName}.${modelName}`, {
@@ -237,6 +237,19 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath, callerNam
                     }
 
                     continue;
+                } else if (dataKey === 'localizations') {
+                    if (data[dataKey].length) {
+                        for (const localizedEntity of data[dataKey]) {
+                            const passedSeed = localizedEntity;
+                            delete passedSeed.localizations;
+
+                            await modelSeeder({
+                                apiPath,
+                                modelName: schema.info.singularName,
+                                passedSeed,
+                            });
+                        }
+                    }
                 }
 
                 const passResults = await findFilesInSeedData({

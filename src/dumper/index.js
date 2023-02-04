@@ -36,6 +36,14 @@ async function modelDumper(apiPath, modelName) {
     const uid = `api::${modelName}.${modelName}`;
     const populate = getDeepPopulate(uid);
 
+    if (populate.localizations) {
+        populate.localizations = {
+            populate: {
+                ...populate,
+            },
+        };
+    }
+
     const entites = await strapi.entityService.findMany(uid, {
         populate,
     });
