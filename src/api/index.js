@@ -9,6 +9,7 @@ const customizeCoreStrapi = require('./customize-core-strapi');
 const lifecycleActions = require('./lifecycle-actions');
 const middlewares = require('./middlewares');
 const getDeepPopulate = require('./get-deep-populate');
+const createDocumentFromTemplate = require('./create-document-from-template');
 
 module.exports = {
     setPermissions,
@@ -19,6 +20,7 @@ module.exports = {
     parseBody,
     customizeCoreStrapi,
     getDeepPopulate,
+    createDocumentFromTemplate,
     ...transformers,
     ...lifecycleActions,
     ...middlewares,
