@@ -17,7 +17,11 @@ async function seeder(apiPath) {
 
     if (apiDirs.length) {
         for (const modelName of apiDirs) {
-            await modelSeeder({ apiPath, modelName });
+            try {
+                await modelSeeder({ apiPath, modelName });
+            } catch (error) {
+                console.log('🚀 ~ seeder ~ error', modelName, error?.message);
+            }
         }
     }
 }
