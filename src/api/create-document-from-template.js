@@ -48,26 +48,6 @@ async function createDocumentFromTemplate(ctx) {
             return ctx.badRequest(err.message);
         });
 
-        if (saveFile) {
-            const pdfFileName = `${uid}_${params?.id || Date.now()}}.pdf`;
-
-            const pdfFileMeta = {
-                name: pdfFileName,
-                type: 'application/pdf',
-                size: Buffer.byteLength(pdfBuffer),
-                buffer: pdfBuffer,
-            };
-
-            const createdFile = await strapi
-                .plugin('upload')
-                .service('upload')
-                .upload({
-                    files: pdfFileMeta,
-                    data: {},
-                })
-                .then((res) => res[0]);
-        }
-
         return pdfBuffer;
     }
 }
