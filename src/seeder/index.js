@@ -13,7 +13,8 @@ const path = require('path');
  * @param {string} apiPath - path.join(__dirname, './api') if you call that function from bootstrap.js
  */
 async function seeder(apiPath) {
-    const apiDirs = await fs.readdir(apiPath);
+    let apiDirs = await fs.readdir(apiPath);
+    apiDirs.reverse();
 
     if (apiDirs.length) {
         for (const modelName of apiDirs) {
@@ -81,14 +82,19 @@ async function modelSeeder({ apiPath, modelName, callerName, passedSeed }) {
     }
 }
 
-async function findFilesInSeedData({ data, path = '', schema, apiPath, callerName }) {
+async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, callerName }) {
     if (data && typeof data === 'object') {
         if (Array.isArray(data)) {
             let resData = [...data];
 
             for (const [index, entry] of data.entries()) {
-                const entryPath = `${path}[${index}]`;
-                const resEntry = await findFilesInSeedData({ data: entry, path: entryPath, schema, apiPath });
+                const entryPath = `${itemPath}[${index}]`;
+                const resEntry = await findFilesInSeedData({
+                    data: entry,
+                    itemPath: entryPath,
+                    schema,
+                    apiPath,
+                });
 
                 resData = R.modifyPath([index], () => resEntry, resData);
             }
@@ -254,11 +260,37 @@ async function findFilesInSeedData({ data, path = '', schema, apiPath, callerNam
                             });
                         }
                     }
+                } else if (dataKey === '__component') {
+                    const pathToComponentSchema = path.join(
+                        apiPath,
+                        `../components/${data[dataKey].replace('.', '/')}.json`
+                    );
+                    const componentSchema = await fs
+                        .readFile(pathToComponentSchema, 'utf8')
+                        .catch((error) => {
+                            // console.log(`🚀 ~ seed ~ error`, error);
+                        });
+
+                    const componentSchemaJson = JSON.parse(componentSchema);
+
+                    for (const schemaKey in componentSchemaJson.attributes) {
+                        if (componentSchemaJson.attributes[schemaKey].type === 'relation') {
+                            const relationModelName = componentSchemaJson.attributes[schemaKey].target
+                                .split('::')[1]
+                                .split('.')[0];
+
+                            await modelSeeder({
+                                apiPath,
+                                modelName: relationModelName,
+                                callerName: schema.info.singularName,
+                            });
+                        }
+                    }
                 }
 
                 const passResults = await findFilesInSeedData({
                     data: data[dataKey],
-                    path: `${path}${dataKey}`,
+                    itemPath: `${itemPath}${dataKey}`,
                     schema,
                     apiPath,
                 });
