@@ -13,8 +13,7 @@ const path = require('path');
  * @param {string} apiPath - path.join(__dirname, './api') if you call that function from bootstrap.js
  */
 async function seeder(apiPath) {
-    let apiDirs = await fs.readdir(apiPath);
-    apiDirs.reverse();
+    const apiDirs = await fs.readdir(apiPath);
 
     if (apiDirs.length) {
         for (const modelName of apiDirs) {
