@@ -146,30 +146,21 @@ module.exports = {
         return recoveredAddress && recoveredAddress.toLowerCase() === account;
     },
 
-    async checkEmailConfirmationCode({ code, email, ctx }) {
-        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
-            filters: {
-                confirmationToken: code,
-                email,
-            },
-        });
+    async checkEmailConfirmationCode({ code, id, ctx }) {
+        const user = await strapi.entityService.findOne('plugin::users-permissions.user', id);
 
-        if (!user) {
-            return ctx.badRequest('Token is invalid');
+        if (user.confirmationToken !== code) {
+            throw new Error('Invalid code');
         }
 
         return user;
     },
 
-    async checkPhoneConfirmationCode({ code, ctx }) {
-        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
-            filters: {
-                phone_confirmation_token: code,
-            },
-        });
+    async checkPhoneConfirmationCode({ code, id, ctx }) {
+        const user = await strapi.entityService.findOne('plugin::users-permissions.user', id);
 
-        if (!user) {
-            return ctx.badRequest('token.invalid');
+        if (user.phone_confirmation_token !== code) {
+            throw new Error('Invalid code');
         }
 
         return user;
@@ -189,7 +180,7 @@ module.exports = {
         });
 
         if (!isValid) {
-            return ctx.badRequest('Invalid code');
+            throw new Error('Invalid code');
         }
 
         return user;

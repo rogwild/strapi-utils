@@ -200,15 +200,33 @@ module.exports = {
 
     async emailConfirmation(ctx) {
         const { code: confirmationToken, email } = ctx.query;
+        let id = ctx.query.id;
+
         const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
         if (_.isEmpty(confirmationToken)) {
             return ctx.badRequest('Token is invalid');
         }
 
+        if (!id) {
+            const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+                filters: {
+                    email,
+                },
+            });
+
+            if (user) {
+                id = user.id;
+            }
+        }
+
+        if (!id) {
+            return ctx.badRequest('User not found');
+        }
+
         const user = await strapi
             .service('plugin::users-permissions.user')
-            .checkEmailConfirmationCode({ code: confirmationToken, email });
+            .checkEmailConfirmationCode({ code: confirmationToken, id });
 
         if (user.id === ctx.state?.user?.id) {
             await strapi.entityService.update('plugin::users-permissions.user', user.id, {
@@ -441,19 +459,83 @@ module.exports = {
     },
 
     async phoneConfirmation(ctx) {
-        const { code: confirmationToken } = ctx.query;
+        const { code: confirmationToken, phone } = ctx.query;
+        let id = ctx.query.id;
         const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
         if (!confirmationToken) {
             return ctx.badRequest('token.invalid');
         }
 
+        if (!id) {
+            const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+                filters: {
+                    phone,
+                },
+            });
+
+            if (user) {
+                id = user.id;
+            }
+        }
+
+        if (!id) {
+            return ctx.badRequest('User not found');
+        }
+
         const user = await strapi
             .service('plugin::users-permissions.user')
-            .checkPhoneConfirmationCode({ code: confirmationToken });
+            .checkPhoneConfirmationCode({ code: confirmationToken, id });
 
         const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
         return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key });
+    },
+
+    async checkFactors(ctx) {
+        const { query } = ctx.request;
+        const { data } = parseBody(ctx);
+        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+        const currentFactor = data.current;
+
+        const user = await strapi.entityService.findOne('plugin::users-permissions.user', data.id);
+
+        try {
+            for (const model of Object.keys(data)) {
+                for (const handler of Object.keys(data[model])) {
+                    if (model === 'user') {
+                        if (handler === 'checkOtp') {
+                            await strapi
+                                .service('plugin::users-permissions.user')
+                                .checkOtpCode({ code: data[model][handler], id: data.id, ctx });
+                        }
+                    } else if (model === 'auth') {
+                        if (handler === 'phoneConfirmation') {
+                            await strapi
+                                .service('plugin::users-permissions.user')
+                                .checkEmailConfirmationCode({
+                                    code: data[model][handler],
+                                    id: data.id,
+                                    ctx,
+                                });
+                        } else if (handler === 'emailConfirmation') {
+                            await strapi
+                                .service('plugin::users-permissions.user')
+                                .checkPhoneConfirmationCode({
+                                    code: data[model][handler],
+                                    id: data.id,
+                                    ctx,
+                                });
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            return ctx.badRequest(error.message);
+        }
+
+        const authFactors = strapi.plugins['users-permissions'].config('authFactors');
+
+        return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key, currentFactor });
     },
 };

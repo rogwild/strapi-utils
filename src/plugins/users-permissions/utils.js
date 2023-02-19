@@ -59,9 +59,31 @@ function getAuthFactorIndex(name, authFactors) {
         if (Array.isArray(authFactor.handler)) {
             authFactor;
 
-            for (const nestedAuthFactor of authFactor.handler) {
-                nestedAuthFactor;
-                if (nestedAuthFactor === name) {
+            /**
+             * For multi page factors
+             * name: auth.confirmPhone
+             */
+            if (typeof name === 'string') {
+                for (const nestedAuthFactor of authFactor.handler) {
+                    nestedAuthFactor;
+                    if (nestedAuthFactor === name) {
+                        factorIndex = index;
+
+                        if (index === authFactors.factors.length - 1) {
+                            isLast = true;
+                        }
+
+                        if (index === 0) {
+                            isFirst = true;
+                        }
+                    }
+                }
+                /**
+                 * For one page multifactors
+                 * name: { handler: ["user.checkOtp", "auth.confirmPhone"], type: "parallel"}
+                 */
+            } else {
+                if (JSON.stringify(authFactor) === JSON.stringify(name)) {
                     factorIndex = index;
 
                     if (index === authFactors.factors.length - 1) {
@@ -99,9 +121,9 @@ function getAuthFactorIndex(name, authFactors) {
     };
 }
 
-async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key }) {
+async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key, currentFactor }) {
     const currentAuthFactorParams = getAuthFactorsParams({
-        name: ctx.state.route.handler,
+        name: currentFactor || ctx.state.route.handler,
         user,
         authFactors,
     });
