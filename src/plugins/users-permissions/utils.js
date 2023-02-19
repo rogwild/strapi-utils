@@ -131,6 +131,8 @@ async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key,
     await strapi.entityService.update('plugin::users-permissions.user', user.id, {
         data: {
             next_auth_factor_key: null,
+            confirmationToken: null,
+            phone_confirmation_token: null,
         },
     });
 

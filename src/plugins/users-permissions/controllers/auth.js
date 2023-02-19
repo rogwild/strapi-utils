@@ -224,9 +224,14 @@ module.exports = {
             return ctx.badRequest('User not found');
         }
 
-        const user = await strapi
-            .service('plugin::users-permissions.user')
-            .checkEmailConfirmationCode({ code: confirmationToken, id });
+        let user;
+        try {
+            user = await strapi
+                .service('plugin::users-permissions.user')
+                .checkEmailConfirmationCode({ code: confirmationToken, id });
+        } catch (error) {
+            return ctx.badRequest(error.message);
+        }
 
         if (user.id === ctx.state?.user?.id) {
             await strapi.entityService.update('plugin::users-permissions.user', user.id, {
@@ -483,9 +488,14 @@ module.exports = {
             return ctx.badRequest('User not found');
         }
 
-        const user = await strapi
-            .service('plugin::users-permissions.user')
-            .checkPhoneConfirmationCode({ code: confirmationToken, id });
+        let user;
+        try {
+            user = await strapi
+                .service('plugin::users-permissions.user')
+                .checkPhoneConfirmationCode({ code: confirmationToken, id });
+        } catch (error) {
+            return ctx.badRequest(error.message);
+        }
 
         const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
@@ -500,6 +510,10 @@ module.exports = {
 
         const user = await strapi.entityService.findOne('plugin::users-permissions.user', data.id);
 
+        if (!data.id) {
+            return ctx.badRequest('No user id provided');
+        }
+
         try {
             for (const model of Object.keys(data)) {
                 for (const handler of Object.keys(data[model])) {
@@ -513,7 +527,7 @@ module.exports = {
                         if (handler === 'phoneConfirmation') {
                             await strapi
                                 .service('plugin::users-permissions.user')
-                                .checkEmailConfirmationCode({
+                                .checkPhoneConfirmationCode({
                                     code: data[model][handler],
                                     id: data.id,
                                     ctx,
@@ -521,7 +535,7 @@ module.exports = {
                         } else if (handler === 'emailConfirmation') {
                             await strapi
                                 .service('plugin::users-permissions.user')
-                                .checkPhoneConfirmationCode({
+                                .checkEmailConfirmationCode({
                                     code: data[model][handler],
                                     id: data.id,
                                     ctx,
@@ -535,6 +549,13 @@ module.exports = {
         }
 
         const authFactors = strapi.plugins['users-permissions'].config('authFactors');
+
+        await strapi.entityService.update('plugin::users-permissions.user', data.id, {
+            data: {
+                phone_confirmation_token: null,
+                confirmationToken: null,
+            },
+        });
 
         return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key, currentFactor });
     },
