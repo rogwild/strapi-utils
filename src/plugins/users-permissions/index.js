@@ -9,4 +9,5 @@ module.exports = {
     services: {
         user: require('./services/user'),
     },
+    utils: require('./utils'),
 };

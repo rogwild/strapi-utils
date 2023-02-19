@@ -7,7 +7,7 @@ const {
     validateCreateUserBody,
     validateUpdateUserBody,
 } = require('@strapi/plugin-users-permissions/server/controllers/validation/user');
-const { getAuthFactorsParams } = require('../utils');
+const { getAuthFactorsParams, factorsMiddleware } = require('../utils');
 
 const sanitizeOutput = (user, ctx) => {
     const { auth } = ctx.state;
@@ -86,60 +86,11 @@ module.exports = {
         const { code } = ctx.query;
         const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
 
-        const userService = getService('user');
+        const user = await strapi.service('plugin::users-permissions.user').checkOtpCode({ ctx, code, id });
 
-        const user = await userService.fetch(id);
-        if (!user.is_otp_confirmation_enabled) {
-            return ctx.badRequest('2FA is not active');
-        }
+        const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
-        const authFactors = getAuthFactorsParams('user.checkOtp', user);
-
-        if (
-            user.next_auth_factor_key !== next_auth_factor_key ||
-            (!next_auth_factor_key && !authFactors.isFirst)
-        ) {
-            return ctx.badRequest('Previous auth steps were skipped');
-        }
-
-        const isValid = speakeasy.totp.verify({
-            secret: user.otp_secret,
-            encoding: 'base32',
-            token: code,
-        });
-
-        if (!isValid) {
-            return ctx.badRequest('Invalid code');
-        }
-
-        await strapi.entityService.update('plugin::users-permissions.user', user.id, {
-            data: {
-                next_auth_factor_key: null,
-            },
-        });
-
-        if (authFactors.isLast) {
-            return ctx.send({
-                jwt: getService('jwt').issue({ id: user.id }),
-                user: await sanitizeOutput(user, ctx),
-            });
-        }
-
-        const nextAuthFactorKey = getService('jwt').issue({
-            nextAuthFactor: authFactors.nextAuthFactor,
-        });
-
-        const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
-            data: {
-                next_auth_factor_key: nextAuthFactorKey,
-            },
-        });
-
-        return ctx.send({
-            nextAuthFactor: authFactors.nextAuthFactor,
-            nextAuthFactorKey: nextAuthFactorKey,
-            user: await sanitizeOutput(entity, ctx),
-        });
+        return factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key });
     },
 
     async deleteOtp(ctx) {

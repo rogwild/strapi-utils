@@ -1,10 +1,28 @@
-function getAuthFactorsParams(name, user) {
-    const authFactors = strapi.plugins['users-permissions'].config('authFactors');
+const { getService } = require('@strapi/plugin-users-permissions/server/utils');
+const utils = require('@strapi/utils');
+const { getAbsoluteAdminUrl, getAbsoluteServerUrl, sanitize } = utils;
+
+const sanitizeOutput = (user, ctx) => {
+    const { auth } = ctx.state;
+    const userSchema = strapi.getModel('plugin::users-permissions.user');
+
+    return sanitize.contentAPI.output(user, userSchema, { auth });
+};
+
+function getActionFactorsParams({ name, user, authFactors }) {
+    const factors = strapi.plugins['users-permissions'].config('authFactors');
+    const { isFirst, factorIndex, isLast } = getAuthFactorIndex(name, authFactors);
+    const actions = strapi.config.get('plugin.actions');
+
+    console.log('🚀 ~ getActionFactorsParams ~ actions', actions);
+}
+
+function getAuthFactorsParams({ name, user, authFactors }) {
     const { isFirst, factorIndex, isLast } = getAuthFactorIndex(name, authFactors);
 
     // console.log('🚀 ~ getAuthFactorsParams ~ authFactors', authFactors);
 
-    let nextAuthFactor = isLast ? undefined : authFactors[factorIndex + 1];
+    let nextAuthFactor = isLast ? undefined : authFactors.factors[factorIndex + 1];
 
     if (nextAuthFactor === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
         return getAuthFactorsParams('user.checkOtp', user);
@@ -30,20 +48,23 @@ function getAuthFactorsParams(name, user) {
 }
 
 function getAuthFactorIndex(name, authFactors) {
+    authFactors;
+    name;
     let isFirst = false;
     let isLast = false;
     let factorIndex = 0;
 
-    for (const [index, authFactor] of authFactors.entries()) {
-        if (Array.isArray(authFactor)) {
+    for (const [index, authFactor] of authFactors.factors.entries()) {
+        authFactor;
+        if (Array.isArray(authFactor.handler)) {
             authFactor;
 
-            for (const nestedAuthFactor of authFactor) {
+            for (const nestedAuthFactor of authFactor.handler) {
                 nestedAuthFactor;
                 if (nestedAuthFactor === name) {
                     factorIndex = index;
 
-                    if (index === authFactors.length - 1) {
+                    if (index === authFactors.factors.length - 1) {
                         isLast = true;
                     }
 
@@ -53,9 +74,21 @@ function getAuthFactorIndex(name, authFactors) {
                 }
             }
         } else {
-            isLast = authFactors.indexOf(name) === authFactors.length - 1;
-            factorIndex = authFactors.indexOf(name);
-            isFirst = authFactors.indexOf(name) === 0;
+            authFactor;
+            name;
+            authFactors.factors;
+            authFactor.handler;
+            if (authFactor.handler === name) {
+                factorIndex = index;
+
+                if (index === authFactors.factors.length - 1) {
+                    isLast = true;
+                }
+
+                if (index === 0) {
+                    isFirst = true;
+                }
+            }
         }
     }
 
@@ -66,6 +99,55 @@ function getAuthFactorIndex(name, authFactors) {
     };
 }
 
+async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key }) {
+    const currentAuthFactorParams = getAuthFactorsParams({
+        name: ctx.state.route.handler,
+        user,
+        authFactors,
+    });
+
+    await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+        data: {
+            next_auth_factor_key: null,
+        },
+    });
+
+    if (next_auth_factor_key) {
+        if (user.next_auth_factor_key !== next_auth_factor_key) {
+            return ctx.badRequest('Previous auth steps were skipped');
+        }
+    }
+
+    if (!next_auth_factor_key && !currentAuthFactorParams.isFirst) {
+        return ctx.badRequest('Previous auth steps were skipped');
+    }
+
+    if (currentAuthFactorParams.isLast) {
+        return ctx.send({
+            jwt: getService('jwt').issue({ id: user.id }),
+            user: await sanitizeOutput(user, ctx),
+        });
+    }
+
+    const nextAuthFactorKey = getService('jwt').issue({
+        nextAuthFactor: currentAuthFactorParams.nextAuthFactor,
+    });
+
+    const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+        data: {
+            next_auth_factor_key: nextAuthFactorKey,
+        },
+    });
+
+    return ctx.send({
+        nextAuthFactor: currentAuthFactorParams.nextAuthFactor,
+        nextAuthFactorKey: nextAuthFactorKey,
+        user: await sanitizeOutput(entity, ctx),
+    });
+}
+
 module.exports = {
     getAuthFactorsParams,
+    getActionFactorsParams,
+    factorsMiddleware,
 };

@@ -1,4 +1,5 @@
 const urlJoin = require('url-join');
+const speakeasy = require('speakeasy');
 const { getAbsoluteServerUrl, sanitize } = require('@strapi/utils');
 const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 const ethers = require('ethers');
@@ -143,5 +144,54 @@ module.exports = {
         }
 
         return recoveredAddress && recoveredAddress.toLowerCase() === account;
+    },
+
+    async checkEmailConfirmationCode({ code, email, ctx }) {
+        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+            filters: {
+                confirmationToken: code,
+                email,
+            },
+        });
+
+        if (!user) {
+            return ctx.badRequest('Token is invalid');
+        }
+
+        return user;
+    },
+
+    async checkPhoneConfirmationCode({ code, ctx }) {
+        const [user] = await strapi.entityService.findMany('plugin::users-permissions.user', {
+            filters: {
+                phone_confirmation_token: code,
+            },
+        });
+
+        if (!user) {
+            return ctx.badRequest('token.invalid');
+        }
+
+        return user;
+    },
+
+    async checkOtpCode({ ctx, id, code }) {
+        const user = await strapi.entityService.findOne('plugin::users-permissions.user', id);
+
+        if (!user.is_otp_confirmation_enabled) {
+            return ctx.badRequest('2FA is not active');
+        }
+
+        const isValid = speakeasy.totp.verify({
+            secret: user.otp_secret,
+            encoding: 'base32',
+            token: code,
+        });
+
+        if (!isValid) {
+            return ctx.badRequest('Invalid code');
+        }
+
+        return user;
     },
 };
