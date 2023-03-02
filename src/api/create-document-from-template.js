@@ -10,12 +10,17 @@ const templateSettings = {
 const templater = (tmpl) => _.template(tmpl, templateSettings);
 
 async function createDocumentFromTemplate(ctx) {
-    const { uid, format = 'html', params, saveFile = false } = ctx;
+    const { uid, id, format = 'html', params, saveFile = false } = ctx;
+    const filters = {};
+
+    if (id) {
+        filters.id = id;
+    } else if (uid) {
+        filters.name = uid;
+    }
 
     const [docTemplate] = await strapi.entityService.findMany('plugin::email-designer.email-template', {
-        filters: {
-            name: uid,
-        },
+        filters,
     });
 
     let html;
