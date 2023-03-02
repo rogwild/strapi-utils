@@ -151,6 +151,12 @@ module.exports = {
 
         if (user.confirmationToken !== code) {
             throw new Error('Invalid code');
+        } else {
+            await strapi.entityService.update('plugin::users-permissions.user', id, {
+                data: {
+                    confirmationToken: null,
+                },
+            });
         }
 
         return user;
@@ -161,6 +167,12 @@ module.exports = {
 
         if (user.phone_confirmation_token !== code) {
             throw new Error('Invalid code');
+        } else {
+            await strapi.entityService.update('plugin::users-permissions.user', id, {
+                data: {
+                    phone_confirmation_token: null,
+                },
+            });
         }
 
         return user;
