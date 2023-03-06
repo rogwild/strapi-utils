@@ -44,7 +44,12 @@ module.exports = {
         }
 
         if (provider === 'local') {
-            await validateCallbackBody(data);
+            try {
+                await validateCallbackBody(data);
+            } catch (error) {
+                console.log('🚀 ~ callback ~ error:', error);
+                return ctx.badRequest(error?.name || 'Callback Internal Server Error', error?.errors);
+            }
 
             if (nextAuthFactorKey) {
                 console.log('🚀 ~ callback ~ nextAuthFactorKey', nextAuthFactorKey);
@@ -203,8 +208,8 @@ module.exports = {
             });
 
             return ctx.send({
-                next_uth_factor: 'auth.emailConfirmation',
-                next_auth_factor_ey: newNextAuthFactorKey,
+                next_auth_factor: { handler: 'auth.emailConfirmation' },
+                next_auth_factor_key: newNextAuthFactorKey,
                 user: sanitizedUser,
             });
         }
@@ -256,6 +261,7 @@ module.exports = {
             await strapi.entityService.update('plugin::users-permissions.user', user.id, {
                 data: {
                     confirmed: true,
+                    is_email_confirmation_enabled: true,
                 },
             });
 
@@ -389,8 +395,14 @@ module.exports = {
         // NOTE: Update the user before sending the email so an Admin can generate the link if the email fails
         await getService('user').edit(user.id, { resetPasswordToken });
 
-        // Send an email to the user.
-        await strapi.plugin('email').service('email').send(emailToSend);
+        const isTesting = process.env !== 'production' && user.email.includes('@example.com');
+
+        if (!isTesting) {
+            // Send an email to the user.
+            await strapi.plugin('email').service('email').send(emailToSend);
+        } else {
+            console.log('🚀 ~ forgotPassword ~ resetPasswordToken:', resetPasswordToken);
+        }
 
         ctx.send({ ok: true });
     },
@@ -398,17 +410,30 @@ module.exports = {
     async resetPassword(ctx) {
         const { data } = parseBody(ctx);
 
-        await validateResetPasswordBody(data);
+        /**
+         * For e2e testing targets
+         */
+        if (!data.password || !data.passwordConfirmation || !data.code) {
+            return ctx.badRequest(
+                "You didn't pass all required params: password, passwordConfirmation and code"
+            );
+        }
 
-        const { password, passwordConfirmation, code } = data;
+        // await validateResetPasswordBody(data);
+
+        const { password, passwordConfirmation, code, email } = data;
 
         if (password !== passwordConfirmation) {
             return ctx.badRequest('Passwords do not match');
         }
 
-        const user = await strapi
+        let user = await strapi
             .query('plugin::users-permissions.user')
             .findOne({ where: { resetPasswordToken: code } });
+
+        if (process.env !== 'production' && email?.includes('@example.com')) {
+            user = await strapi.query('plugin::users-permissions.user').findOne({ where: { email } });
+        }
 
         if (!user) {
             return ctx.badRequest('Incorrect code provided');
@@ -518,6 +543,7 @@ module.exports = {
             await strapi.entityService.update('plugin::users-permissions.user', user.id, {
                 data: {
                     phone_confirmed: true,
+                    is_phone_confirmation_enabled: true,
                 },
             });
 

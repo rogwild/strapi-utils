@@ -80,7 +80,7 @@ module.exports = {
 
         const sanitizedData = await sanitizeOutput(entity, ctx);
 
-        ctx.send(sanitizedData);
+        ctx.send({ user: sanitizedData });
     },
 
     async checkOtp(ctx) {
@@ -130,7 +130,7 @@ module.exports = {
 
         const sanitizedUser = await sanitizeOutput(entity, ctx);
 
-        ctx.send(sanitizedUser);
+        ctx.send({ user: sanitizedUser });
     },
 
     /**
