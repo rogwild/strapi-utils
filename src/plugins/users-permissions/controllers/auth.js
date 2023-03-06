@@ -32,7 +32,7 @@ module.exports = {
         const provider = ctx.params.provider || 'local';
         const { query } = ctx.request;
         const { data } = parseBody(ctx);
-        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+        const nextAuthFactorKey = ctx.headers['next-auth-factor-key'];
 
         const store = strapi.store({ type: 'plugin', name: 'users-permissions' });
         const grantSettings = await store.get({ key: 'grant' });
@@ -46,8 +46,8 @@ module.exports = {
         if (provider === 'local') {
             await validateCallbackBody(data);
 
-            if (next_auth_factor_key) {
-                console.log('🚀 ~ callback ~ next_auth_factor_key', next_auth_factor_key);
+            if (nextAuthFactorKey) {
+                console.log('🚀 ~ callback ~ nextAuthFactorKey', nextAuthFactorKey);
             }
 
             const { identifier } = data;
@@ -87,7 +87,7 @@ module.exports = {
 
             const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
-            return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key });
+            return factorsMiddleware({ ctx, authFactors, user, nextAuthFactorKey });
         }
 
         // Connect the user with the third-party provider.
@@ -125,7 +125,12 @@ module.exports = {
             data.username = data.email;
         }
 
-        await validateRegisterBody(data);
+        try {
+            await validateRegisterBody(data);
+        } catch (error) {
+            console.log('🚀 ~ register ~ error:', error);
+            return ctx.badRequest(error?.name || 'Register Internal Server Error', error?.errors);
+        }
 
         const role = await strapi
             .query('plugin::users-permissions.role')
@@ -182,12 +187,26 @@ module.exports = {
 
         if (settings.email_confirmation) {
             try {
-                await getService('user').sendConfirmationEmail(sanitizedUser);
+                await getService('user').sendConfirmationEmail({ user, ctx });
             } catch (err) {
                 return ctx.badRequest(err.message);
             }
 
-            return ctx.send({ user: sanitizedUser });
+            const newNextAuthFactorKey = getService('jwt').issue({
+                nextAuthFactor: 'auth.emailConfirmation',
+            });
+
+            const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+                data: {
+                    next_auth_factor_key: newNextAuthFactorKey,
+                },
+            });
+
+            return ctx.send({
+                next_uth_factor: 'auth.emailConfirmation',
+                next_auth_factor_ey: newNextAuthFactorKey,
+                user: sanitizedUser,
+            });
         }
 
         const jwt = getService('jwt').issue(_.pick(user, ['id']));
@@ -202,7 +221,7 @@ module.exports = {
         const { code: confirmationToken, email } = ctx.query;
         let id = ctx.query.id;
 
-        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+        const nextAuthFactorKey = ctx.headers['next-auth-factor-key'];
 
         if (_.isEmpty(confirmationToken)) {
             return ctx.badRequest('Token is invalid');
@@ -233,25 +252,23 @@ module.exports = {
             return ctx.badRequest(error.message);
         }
 
-        if (user.id === ctx.state?.user?.id) {
+        if (!user.confirmed) {
             await strapi.entityService.update('plugin::users-permissions.user', user.id, {
                 data: {
                     confirmed: true,
-                    confirmationToken: null,
-                    next_auth_factor_key: null,
                 },
             });
 
             return ctx.send({
                 data: {
-                    emailConfirmed: true,
+                    email_confirmed: true,
                 },
             });
         }
 
         const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
-        return factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key });
+        return factorsMiddleware({ ctx, user, authFactors, nextAuthFactorKey });
     },
 
     async sendEmailConfirmation(ctx) {
@@ -466,7 +483,7 @@ module.exports = {
     async phoneConfirmation(ctx) {
         const { code: confirmationToken, phone } = ctx.query;
         let id = ctx.query.id;
-        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+        const nextAuthFactorKey = ctx.headers['next-auth-factor-key'];
 
         if (!confirmationToken) {
             return ctx.badRequest('token.invalid');
@@ -497,15 +514,29 @@ module.exports = {
             return ctx.badRequest(error.message);
         }
 
+        if (!user.phone_confirmed) {
+            await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+                data: {
+                    phone_confirmed: true,
+                },
+            });
+
+            return ctx.send({
+                data: {
+                    phone_confirmed: true,
+                },
+            });
+        }
+
         const authFactors = strapi.plugins['users-permissions'].config('authFactors');
 
-        return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key });
+        return factorsMiddleware({ ctx, authFactors, user, nextAuthFactorKey });
     },
 
     async checkFactors(ctx) {
         const { query } = ctx.request;
         const { data } = parseBody(ctx);
-        const next_auth_factor_key = ctx.headers['next-auth-factor-key'];
+        const nextAuthFactorKey = ctx.headers['next-auth-factor-key'];
         const currentFactor = data.current;
 
         const user = await strapi.entityService.findOne('plugin::users-permissions.user', data.id);
@@ -557,6 +588,6 @@ module.exports = {
             },
         });
 
-        return factorsMiddleware({ ctx, authFactors, user, next_auth_factor_key, currentFactor });
+        return factorsMiddleware({ ctx, authFactors, user, nextAuthFactorKey, currentFactor });
     },
 };

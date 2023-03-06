@@ -24,20 +24,23 @@ function getAuthFactorsParams({ name, user, authFactors }) {
 
     let nextAuthFactor = isLast ? undefined : authFactors.factors[factorIndex + 1];
 
-    if (nextAuthFactor === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
-        return getAuthFactorsParams('user.checkOtp', user);
-    }
-
-    if (nextAuthFactor === 'auth.emailConfirmation' && !user.is_email_confirmation_enabled) {
-        return getAuthFactorsParams('auth.emailConfirmation', user);
+    if (nextAuthFactor?.handler === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
+        return getAuthFactorsParams({ name: 'user.checkOtp', user, authFactors });
     }
 
     if (
-        nextAuthFactor === 'auth.phoneConfirmation' &&
+        nextAuthFactor?.handler === 'auth.emailConfirmation' &&
+        (!user.is_email_confirmation_enabled || !user.confirmed)
+    ) {
+        return getAuthFactorsParams({ name: 'auth.emailConfirmation', user, authFactors });
+    }
+
+    if (
+        nextAuthFactor?.handler === 'auth.phoneConfirmation' &&
         user.is_phone_confirmation_enabled &&
         (!user.phone || user.phone === '')
     ) {
-        return getAuthFactorsParams('auth.phoneConfirmation', user);
+        return getAuthFactorsParams({ name: 'auth.phoneConfirmation', user, authFactors });
     }
 
     return {
@@ -45,6 +48,16 @@ function getAuthFactorsParams({ name, user, authFactors }) {
         isFirst,
         nextAuthFactor,
     };
+}
+
+function clearNextAuthFactors(nextAuthFactor, user) {
+    let localnextAuthFactor = { ...nextAuthFactor };
+
+    if (Array.isArray(localnextAuthFactor.handler)) {
+        localnextAuthFactor;
+    }
+
+    return localnextAuthFactor;
 }
 
 function getAuthFactorIndex(name, authFactors) {
@@ -121,7 +134,7 @@ function getAuthFactorIndex(name, authFactors) {
     };
 }
 
-async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key, currentFactor }) {
+async function factorsMiddleware({ ctx, user, authFactors, nextAuthFactorKey, currentFactor }) {
     const currentAuthFactorParams = getAuthFactorsParams({
         name: currentFactor || ctx.state.route.handler,
         user,
@@ -136,13 +149,24 @@ async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key,
         },
     });
 
-    if (next_auth_factor_key) {
-        if (user.next_auth_factor_key !== next_auth_factor_key) {
+    if (nextAuthFactorKey) {
+        if (user.next_auth_factor_key !== nextAuthFactorKey) {
             return ctx.badRequest('Previous auth steps were skipped');
+        }
+
+        const handler = currentFactor || ctx.state.route.handler;
+        const gotNextAuthFactorPayload = await getService('jwt').verify(nextAuthFactorKey);
+
+        if (Array.isArray(gotNextAuthFactorPayload.nextAuthFactor.handler)) {
+            if (!gotNextAuthFactorPayload.nextAuthFactor.handler.includes(handler)) {
+                return ctx.badRequest('Wrong Next-Auth-Factor-Key or api hadler');
+            }
+        } else if (gotNextAuthFactorPayload.nextAuthFactor.handler !== handler) {
+            return ctx.badRequest('Wrong Next-Auth-Factor-Key or api hadler');
         }
     }
 
-    if (!next_auth_factor_key && !currentAuthFactorParams.isFirst) {
+    if (!nextAuthFactorKey && !currentAuthFactorParams.isFirst) {
         return ctx.badRequest('Previous auth steps were skipped');
     }
 
@@ -153,19 +177,19 @@ async function factorsMiddleware({ ctx, user, authFactors, next_auth_factor_key,
         });
     }
 
-    const nextAuthFactorKey = getService('jwt').issue({
+    const newNextAuthFactorKey = getService('jwt').issue({
         nextAuthFactor: currentAuthFactorParams.nextAuthFactor,
     });
 
     const entity = await strapi.entityService.update('plugin::users-permissions.user', user.id, {
         data: {
-            next_auth_factor_key: nextAuthFactorKey,
+            next_auth_factor_key: newNextAuthFactorKey,
         },
     });
 
     return ctx.send({
-        nextAuthFactor: currentAuthFactorParams.nextAuthFactor,
-        nextAuthFactorKey: nextAuthFactorKey,
+        next_auth_factor: currentAuthFactorParams.nextAuthFactor,
+        next_auth_factor_key: nextAuthFactorKey,
         user: await sanitizeOutput(entity, ctx),
     });
 }
