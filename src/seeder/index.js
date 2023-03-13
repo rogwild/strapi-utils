@@ -14,11 +14,12 @@ const path = require('path');
  */
 async function seeder(apiPath) {
     const apiDirs = await fs.readdir(apiPath);
+    const seededEntities = [];
 
     if (apiDirs.length) {
         for (const modelName of apiDirs) {
             try {
-                await modelSeeder({ apiPath, modelName });
+                await modelSeeder({ apiPath, modelName, seededEntities });
             } catch (error) {
                 console.log('🚀 ~ seeder ~ error', modelName, error?.message);
             }
@@ -26,7 +27,7 @@ async function seeder(apiPath) {
     }
 }
 
-async function modelSeeder({ apiPath, modelName, callerName, passedSeed }) {
+async function modelSeeder({ apiPath, modelName, callerName, passedSeed, seededEntities }) {
     const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seed.json`);
     const seed = await fs.readFile(pathToSeed, 'utf8').catch((error) => {
         // console.log(`🚀 ~ seed ~ error`, error);
@@ -37,51 +38,150 @@ async function modelSeeder({ apiPath, modelName, callerName, passedSeed }) {
         // console.log(`🚀 ~ seed ~ error`, error);
     });
 
+    const seedModels = process.env.SEED_MODELS || '*';
+    if (!seedModels) {
+        return;
+    }
+
+    if (seedModels !== '*') {
+        const seedModelsArray = seedModels.split(',');
+        if (!seedModelsArray.includes(modelName)) {
+            return;
+        }
+    }
+
     if (!seed || !schema || seed === null) {
         return;
     }
 
-    console.log('🚀 ~ modelSeeder ~ seeding', modelName);
+    if (seededEntities.includes(modelName)) {
+        return;
+    }
+
+    console.log('🚀 ~ modelSeeder ~ modelName:', modelName);
 
     const seedAsJson = passedSeed ? passedSeed : JSON.parse(seed);
     const schemaAsJson = JSON.parse(schema);
 
-    const modelEntities = await strapi.entityService.findMany(`api::${modelName}.${modelName}`, {
-        populate: {
-            favicon: '*',
-        },
-    });
+    if (Array.isArray(seedAsJson)) {
+        const allModified = [];
 
-    if (!modelEntities || modelEntities?.length === 0) {
-        if (Array.isArray(seedAsJson)) {
-            for (const seedItem of seedAsJson) {
-                const modified = await findFilesInSeedData({
-                    data: seedItem,
-                    schema: schemaAsJson,
-                    apiPath,
-                    callerName,
-                });
-
-                await strapi.entityService.create(`api::${modelName}.${modelName}`, {
-                    data: modified,
-                });
-            }
-        } else {
+        for (const seedItem of seedAsJson) {
             const modified = await findFilesInSeedData({
-                data: seedAsJson,
+                data: seedItem,
                 schema: schemaAsJson,
                 apiPath,
                 callerName,
+                seededEntities,
             });
 
-            await strapi.entityService.create(`api::${modelName}.${modelName}`, {
-                data: modified,
-            });
+            allModified.push(modified);
+            await createOrUpdateEntity({ modified, modelName });
         }
+
+        const allEntites = await strapi.entityService.findMany(`api::${modelName}.${modelName}`, {
+            limit: -1,
+        });
+
+        if (process.env.IF_NO_ENTITY_IN_SEED) {
+            const compareBy = process.env.COMPARE_BY;
+
+            if (!compareBy) {
+                console.log('Add process.env.COMPARE_BY for checking model existing');
+            } else {
+                for (const entity of allEntites) {
+                    const compareKeys = process.env.COMPARE_BY.split(',');
+                    let compareKey;
+
+                    for (const key of compareKeys) {
+                        if (entity[key]) {
+                            compareKey = key;
+                            break;
+                        }
+                    }
+
+                    let existsInJson = false;
+
+                    if (!compareKey) {
+                        console.log(
+                            `Add key to process.env.COMPARE_BY for checking ${modelName} model existing. Skip deleting.`
+                        );
+
+                        existsInJson = true;
+                    } else {
+                        for (const allModifiedEntity of allModified) {
+                            if (entity[compareKey] === allModifiedEntity[compareKey]) {
+                                existsInJson = true;
+                            }
+                        }
+                    }
+
+                    if (!existsInJson) {
+                        const method = process.env.IF_NO_ENTITY_IN_SEED;
+                        console.log('🚀 ~ modelSeeder ~ entity not exist in JSON', entity);
+
+                        if (method === 'delete') {
+                            await strapi.entityService.delete(`api::${modelName}.${modelName}`, entity.id);
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        const modified = await findFilesInSeedData({
+            data: seedAsJson,
+            schema: schemaAsJson,
+            apiPath,
+            callerName,
+            seededEntities,
+        });
+
+        await createOrUpdateEntity({ modified, modelName });
+    }
+
+    seededEntities.push(modelName);
+}
+
+async function createOrUpdateEntity({ modified, modelName }) {
+    const filters = {};
+    const compareKeys = process.env.COMPARE_BY.split(',');
+
+    for (const key of compareKeys) {
+        if (modified[key]) {
+            filters[key] = modified[key];
+            break;
+        }
+    }
+
+    let currentEntity;
+
+    if (Object.keys(filters).length) {
+        try {
+            const existingEntites = await strapi.entityService.findMany(`api::${modelName}.${modelName}`, {
+                filters,
+            });
+            if (Array.isArray(existingEntites)) {
+                currentEntity = existingEntites[0];
+            } else {
+                currentEntity = existingEntites;
+            }
+        } catch (error) {
+            console.log('🚀 ~ createOrUpdateEntity ~ error:', error);
+        }
+    }
+
+    if (currentEntity) {
+        await strapi.entityService.update(`api::${modelName}.${modelName}`, currentEntity.id, {
+            data: modified,
+        });
+    } else {
+        const created = await strapi.entityService.create(`api::${modelName}.${modelName}`, {
+            data: modified,
+        });
     }
 }
 
-async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, callerName }) {
+async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, callerName, seededEntities }) {
     if (data && typeof data === 'object') {
         if (Array.isArray(data)) {
             let resData = [...data];
@@ -93,6 +193,7 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                     itemPath: entryPath,
                     schema,
                     apiPath,
+                    seededEntities,
                 });
 
                 resData = R.modifyPath([index], () => resEntry, resData);
@@ -102,16 +203,24 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
         } else {
             if (data.mime) {
                 try {
+                    let additionalAttributes = {};
+                    if (data?.headers) {
+                        if (Object.keys(data.headers)?.length) {
+                            additionalAttributes['headers'] = { ...data.headers };
+                        }
+                    }
+
                     const file = await axios({
-                        method: 'get',
+                        method: 'GET',
                         url: data.url,
                         responseType: 'arraybuffer',
+                        ...additionalAttributes,
                     }).then(function (response) {
                         return response.data;
                     });
 
                     const fileMeta = {
-                        name: data.name,
+                        name: data.name.toLowerCase(),
                         type: data.mime,
                         size: Buffer.byteLength(file),
                         buffer: file,
@@ -133,13 +242,13 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                 }
             }
 
-            let resData = { ...data };
+            let resData = {};
 
             for (const dataKey of Object.keys(data)) {
                 const currentModelNames = [schema.info.singularName, schema.info.pluralName];
                 const attributeType = schema.attributes[dataKey]?.type;
 
-                if (['id'].includes(dataKey)) {
+                if (['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(dataKey)) {
                     continue;
                 } else if (['createdBy', 'updatedBy'].includes(dataKey)) {
                     resData = {
@@ -184,9 +293,10 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                                     'id',
                                     'createdAt',
                                     'publishedAt',
-                                    'updatedBy',
                                     'updatedAt',
                                     'publishedAt',
+                                    'createdBy',
+                                    'updatedBy',
                                 ].includes(key) &&
                                 data[dataKey][key]
                             ) {
@@ -217,6 +327,7 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                                     apiPath,
                                     modelName: relationModelName,
                                     callerName: schema.info.singularName,
+                                    seededEntities,
                                 });
                             }
                         }
@@ -256,8 +367,11 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                                 apiPath,
                                 modelName: schema.info.singularName,
                                 passedSeed,
+                                seededEntities,
                             });
                         }
+
+                        continue;
                     }
                 } else if (dataKey === '__component') {
                     const pathToComponentSchema = path.join(
@@ -282,6 +396,7 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                                 apiPath,
                                 modelName: relationModelName,
                                 callerName: schema.info.singularName,
+                                seededEntities,
                             });
                         }
                     }
@@ -292,6 +407,7 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                     itemPath: `${itemPath}${dataKey}`,
                     schema,
                     apiPath,
+                    seededEntities,
                 });
                 const filteredResults = Array.isArray(passResults)
                     ? passResults.filter((res) => res !== undefined)
