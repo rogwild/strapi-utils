@@ -359,17 +359,17 @@ async function findFilesInSeedData({ data, itemPath = '', schema, apiPath, calle
                     continue;
                 } else if (dataKey === 'localizations') {
                     if (data[dataKey].length) {
-                        for (const localizedEntity of data[dataKey]) {
-                            const passedSeed = localizedEntity;
-                            delete passedSeed.localizations;
+                        // for (const localizedEntity of data[dataKey]) {
+                        //     const passedSeed = localizedEntity;
+                        //     delete passedSeed.localizations;
 
-                            await modelSeeder({
-                                apiPath,
-                                modelName: schema.info.singularName,
-                                passedSeed,
-                                seededEntities,
-                            });
-                        }
+                        //     await modelSeeder({
+                        //         apiPath,
+                        //         modelName: schema.info.singularName,
+                        //         passedSeed,
+                        //         seededEntities,
+                        //     });
+                        // }
 
                         continue;
                     }
