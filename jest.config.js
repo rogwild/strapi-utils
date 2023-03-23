@@ -1,4 +1,4 @@
-require(`dotenv`).config('.env');
+require('dotenv').config('.env');
 
 module.exports = {
     testEnvironment: 'node',
@@ -7,9 +7,9 @@ module.exports = {
     moduleFileExtensions: ['js', 'ts', 'json'],
     moduleNameMapper: {},
     testPathIgnorePatterns: [
-        `<rootDir>/node_modules/`,
-        `<rootDir>/.cache`,
-        `<rootDir>/build`,
-        `<rootDir>/.tmp`,
+        '<rootDir>/node_modules/',
+        '<rootDir>/.cache',
+        '<rootDir>/build',
+        '<rootDir>/.tmp',
     ],
 };

@@ -43,7 +43,9 @@
         "@strapi/plugin-i18n": "^4.5.3",
         "@strapi/plugin-users-permissions": "^4.5.3",
         "@strapi/strapi": "^4.5.3",
+        "dotenv": "^16.0.3",
         "eslint-config-prettier": "^8.5.0",
+        "jest": "^29.0.0",
         "prettier": "^2.7.1",
         "rollup": "^2.78.0"
     },
@@ -58,6 +60,9 @@
     },
     "bugs": {
         "url": "https://github.com/rogwild/strapi-utils/issues"
+    },
+    "wallaby": {
+        "maxConsoleMessagesPerTest": 100000
     },
     "homepage": "https://github.com/rogwild/strapi-utils#readme"
 }
