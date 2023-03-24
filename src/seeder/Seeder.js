@@ -47,6 +47,9 @@ class Seeder {
 
         if (Array.isArray(this.seed)) {
             for (const seedItem of this.seed) {
+                if (this.modelName === 'attribute-key') {
+                    console.log('🚀 ~ seedEntites ~ this.modelName:', this.modelName);
+                }
                 const entity = new Entity({
                     seed: seedItem,
                     schema: this.schema,
@@ -91,6 +94,9 @@ class Entity {
     async prepare() {
         for (const seedKey of Object.keys(this.seed)) {
             seedKey; //?
+            if (seedKey === 'attribute') {
+                console.log('🚀 ~ prepare ~ seedKey:', seedKey);
+            }
             const parameter = new Parameter({
                 schema: this.schema,
                 key: seedKey,
@@ -116,7 +122,7 @@ class Entity {
 
             console.log('🚀 ~ create ~ filters:', filters);
 
-            if (this.seeder.modelName === 'product') {
+            if (this.seeder.modelName === 'attribute-key') {
                 console.log('🚀 ~ seedRelations ~ targetModelName:', this.seeder.modelName);
             }
 
@@ -174,6 +180,10 @@ class Parameter {
         value; //?
         // console.log('🚀 ~ setValue ~ value:', value);
 
+        if (this.entity.seeder.modelName === 'attribute') {
+            console.log('🚀 ~ seedRelations ~ targetModelName:', this.entity.seeder.modelName);
+        }
+
         if (
             this.attributes?.multiple === true ||
             ['manyToMany', 'oneToMany'].includes(this.attributes?.relation) ||
@@ -214,9 +224,7 @@ class Parameter {
             await this.downloadFile(this.seedValue);
             return;
         } else if (this.type === 'relation') {
-            if (this.entity?.seeder?.modelName === this.attributes?.mappedBy) {
-                await this.seedRelations();
-            }
+            await this.seedRelations();
             return;
         } else if (this.key === 'localizations') {
             const localizationsContent = await this.seedLocalizations(); //?
@@ -247,27 +255,34 @@ class Parameter {
         const alsoSeededModels = this.entity.seeder.seededModelNames.filter(
             (modelName) => modelName === targetModelName
         ); //?
-        if (
-            alsoSeededModels?.length > 0 ||
-            this.entity.seeder?.skipModels?.includes(targetModelName) ||
-            targetModelName === this.entity.seeder.modelName
-        ) {
-            return;
-        }
 
-        const seed = new Seeder({
-            modelName: targetModelName,
-            apiPath: this.entity.seeder.apiPath,
-            seededModelNames: this.entity.seeder.seededModelNames,
-            // skipModels: [...(this.entity.seeder?.skipModels || []), this.entity.seeder.modelName],
-            seededModels: this.entity.seeder.seededModels,
-        });
-        await seed.setSchema();
-        await seed.setSeed();
-        await seed.seedEntites();
+        if (
+            alsoSeededModels?.length === 0 &&
+            !this.entity.seeder?.skipModels?.includes(targetModelName) &&
+            targetModelName !== this.entity.seeder.modelName
+        ) {
+            const seed = new Seeder({
+                modelName: targetModelName,
+                apiPath: this.entity.seeder.apiPath,
+                seededModelNames: this.entity.seeder.seededModelNames,
+                skipModels: [...(this.entity.seeder?.skipModels || []), this.entity.seeder.modelName].filter(
+                    (model) => {
+                        return model !== targetModelName;
+                    }
+                ),
+                seededModels: this.entity.seeder.seededModels,
+            });
+            await seed.setSchema();
+            await seed.setSeed();
+            await seed.seedEntites();
+        }
 
         if (!this.seedValue) {
             return;
+        }
+
+        if (this.entity.seeder.modelName === 'attribute-key') {
+            console.log('🚀 ~ seedRelations ~ this.entity.seeder.modelName:', this.entity.seeder.modelName);
         }
 
         if (Array.isArray(this.seedValue)) {
@@ -278,7 +293,7 @@ class Parameter {
             for (const relationSeedValue of this.seedValue) {
                 let id;
                 if (relationSeedValue.id) {
-                    id = this.entity.seeder.seededModels[targetModelName].find((seededItems) => {
+                    id = this.entity.seeder.seededModels[targetModelName]?.find((seededItems) => {
                         if (seededItems.old.id === relationSeedValue.id) {
                             return true;
                         }
@@ -301,7 +316,7 @@ class Parameter {
         } else {
             let id;
             if (this.seedValue.id) {
-                id = this.entity.seeder.seededModels[targetModelName].find((seededItems) => {
+                id = this.entity.seeder.seededModels[targetModelName]?.find((seededItems) => {
                     if (seededItems.old.id === this.seedValue.id) {
                         return true;
                     }
