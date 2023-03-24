@@ -3,10 +3,9 @@ const fs = require('fs/promises');
 const path = require('path');
 
 class Seeder {
-    constructor({ modelName, apiPath, seededModelNames, skipModels, seededModels }) {
+    constructor({ modelName, apiPath, skipModels, seededModels }) {
         this.modelName = modelName;
         this.apiPath = apiPath;
-        this.seededModelNames = seededModelNames;
         this.skipModels = skipModels;
         this.seededModels = seededModels;
     }
@@ -41,15 +40,12 @@ class Seeder {
         const createdEntites = [];
         this.seed; //?
         if (!this.seed) {
-            this.seededModelNames.push(this.modelName);
+            this.seededModels[this.modelName] = undefined;
             return;
         }
 
         if (Array.isArray(this.seed)) {
             for (const seedItem of this.seed) {
-                if (this.modelName === 'attribute-key') {
-                    console.log('🚀 ~ seedEntites ~ this.modelName:', this.modelName);
-                }
                 const entity = new Entity({
                     seed: seedItem,
                     schema: this.schema,
@@ -75,9 +71,7 @@ class Seeder {
             });
         }
 
-        createdEntites;
         this.seededModels[this.modelName] = createdEntites;
-        this.seededModelNames.push(this.modelName);
         return createdEntites;
     }
 }
@@ -93,10 +87,6 @@ class Entity {
 
     async prepare() {
         for (const seedKey of Object.keys(this.seed)) {
-            seedKey; //?
-            if (seedKey === 'attribute') {
-                console.log('🚀 ~ prepare ~ seedKey:', seedKey);
-            }
             const parameter = new Parameter({
                 schema: this.schema,
                 key: seedKey,
@@ -113,8 +103,7 @@ class Entity {
 
     async create() {
         await this.prepare();
-        this.data; //?
-        this.seeder.seededModelNames; //?
+
         if (this.data) {
             console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
 
@@ -122,11 +111,6 @@ class Entity {
 
             console.log('🚀 ~ create ~ filters:', filters);
 
-            if (this.seeder.modelName === 'attribute-key') {
-                console.log('🚀 ~ seedRelations ~ targetModelName:', this.seeder.modelName);
-            }
-
-            filters; //?
             const existingEntities = await strapi.entityService.findMany(
                 `api::${this.seeder.modelName}.${this.seeder.modelName}`,
                 {
@@ -178,11 +162,6 @@ class Parameter {
 
     setValue(value) {
         value; //?
-        // console.log('🚀 ~ setValue ~ value:', value);
-
-        if (this.entity.seeder.modelName === 'attribute') {
-            console.log('🚀 ~ seedRelations ~ targetModelName:', this.entity.seeder.modelName);
-        }
 
         if (
             this.attributes?.multiple === true ||
@@ -252,7 +231,7 @@ class Parameter {
         this.seedValue; //?
         const targetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
 
-        const alsoSeededModels = this.entity.seeder.seededModelNames.filter(
+        const alsoSeededModels = Object.keys(this.entity.seeder.seededModels).filter(
             (modelName) => modelName === targetModelName
         ); //?
 
@@ -264,7 +243,6 @@ class Parameter {
             const seed = new Seeder({
                 modelName: targetModelName,
                 apiPath: this.entity.seeder.apiPath,
-                seededModelNames: this.entity.seeder.seededModelNames,
                 skipModels: [...(this.entity.seeder?.skipModels || []), this.entity.seeder.modelName].filter(
                     (model) => {
                         return model !== targetModelName;
@@ -279,10 +257,6 @@ class Parameter {
 
         if (!this.seedValue) {
             return;
-        }
-
-        if (this.entity.seeder.modelName === 'attribute-key') {
-            console.log('🚀 ~ seedRelations ~ this.entity.seeder.modelName:', this.entity.seeder.modelName);
         }
 
         if (Array.isArray(this.seedValue)) {
@@ -369,17 +343,55 @@ class Parameter {
     }
 
     async seedComponents() {
-        const components = [];
+        if (!this.seedValue) {
+            return;
+        }
 
-        for (const dzSeedValue of this.seedValue) {
-            this.entity.seeder.apiPath; //?
-            this.seedValue; //?
-            this.attributes; //?
-            dzSeedValue; //?
+        if (Array.isArray(this.seedValue)) {
+            const components = [];
+
+            for (const dzSeedValue of this.seedValue) {
+                this.entity.seeder.apiPath; //?
+                this.seedValue; //?
+                this.attributes; //?
+                dzSeedValue; //?
+                let componentPath;
+
+                if (dzSeedValue?.__component) {
+                    componentPath = dzSeedValue.__component.replace('.', '/'); //?
+                } else if (this.attributes?.component) {
+                    componentPath = this.attributes.component.replace('.', '/'); //?
+                } else {
+                    return;
+                }
+
+                const pathToSchema = path.join(
+                    this.entity.seeder.apiPath,
+                    `../components/${componentPath}.json`
+                ); //?
+                const schema = await fs.readFile(pathToSchema, 'utf8').catch((error) => {
+                    // console.log(`🚀 ~ seed ~ error`, error);
+                }); //?
+
+                this.seedValue; //?
+
+                const entity = new Entity({
+                    seed: dzSeedValue,
+                    schema: JSON.parse(schema),
+                    seeder: this.entity.seeder,
+                }); //?
+
+                await entity.prepare();
+
+                components.push(entity.data);
+            }
+
+            return components;
+        } else {
             let componentPath;
 
-            if (dzSeedValue?.__component) {
-                componentPath = dzSeedValue.__component.replace('.', '/'); //?
+            if (this.seedValue?.__component) {
+                componentPath = this.seedValue.__component.replace('.', '/'); //?
             } else if (this.attributes?.component) {
                 componentPath = this.attributes.component.replace('.', '/'); //?
             } else {
@@ -394,22 +406,18 @@ class Parameter {
             this.seedValue; //?
 
             const entity = new Entity({
-                seed: dzSeedValue,
+                seed: this.seedValue,
                 schema: JSON.parse(schema),
                 seeder: this.entity.seeder,
             }); //?
 
             await entity.prepare();
 
-            components.push(entity.data);
+            return entity.data;
         }
-
-        return components;
     }
 
     async downloadFile(value) {
-        this.seedValue; //?
-
         if (!value) {
             return;
         }
