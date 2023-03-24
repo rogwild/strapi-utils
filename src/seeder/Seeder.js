@@ -256,6 +256,8 @@ class Parameter {
         this.seedValue; //?
         const targetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
 
+        console.log('🚀 ~ seedRelations ~ targetModelName:', targetModelName);
+
         const alsoSeededModels = Object.keys(this.entity.seeder.seededModels).filter(
             (modelName) => modelName === targetModelName
         ); //?
