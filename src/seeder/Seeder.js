@@ -77,11 +77,12 @@ class Seeder {
 }
 
 class Entity {
-    constructor({ seed, schema, seeder }) {
+    constructor({ seed, schema, seeder, updateEntityIfExists = true }) {
         this.seed = seed; //?
         this.schema = schema; //?
         this.data = {};
         this.seeder = seeder;
+        this.updateEntityIfExists = updateEntityIfExists;
         this.keysToSkip = ['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'];
     }
 
@@ -120,10 +121,34 @@ class Entity {
 
             if (Array.isArray(existingEntities)) {
                 if (existingEntities.length) {
-                    return existingEntities[0];
+                    if (this.updateEntityIfExists) {
+                        const updatedEntity = await strapi.entityService.update(
+                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                            existingEntities[0].id,
+                            {
+                                data: this.data,
+                            }
+                        );
+
+                        return updatedEntity;
+                    } else {
+                        return existingEntities[0];
+                    }
                 }
             } else if (existingEntities) {
-                return existingEntities;
+                if (this.updateEntityIfExists) {
+                    const updatedEntity = await strapi.entityService.update(
+                        `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                        existingEntities.id,
+                        {
+                            data: this.data,
+                        }
+                    );
+
+                    return updatedEntity;
+                } else {
+                    return existingEntities;
+                }
             }
 
             try {
@@ -472,17 +497,24 @@ function setFilters({ entity, toSkip = [], id }) {
     if (id) {
         filters['id'] = id;
     } else {
-        for (const relationSeedValueKey of Object.keys(entity)) {
-            relationSeedValueKey; //?
-            if (toSkip.includes(relationSeedValueKey)) {
-                continue;
+        const seederFilterBy = Object.keys(entity).find((key) => key === 'seeder_filter_by');
+        if (seederFilterBy && entity['seeder_filter_by']) {
+            for (const filterKey of entity['seeder_filter_by']) {
+                filters[filterKey] = entity[filterKey];
             }
+        } else {
+            for (const relationSeedValueKey of Object.keys(entity)) {
+                relationSeedValueKey; //?
+                if ([...toSkip, 'publishedAt'].includes(relationSeedValueKey)) {
+                    continue;
+                }
 
-            if (
-                typeof entity[relationSeedValueKey] === 'string' ||
-                typeof entity[relationSeedValueKey] === 'number'
-            ) {
-                filters[relationSeedValueKey] = entity[relationSeedValueKey];
+                if (
+                    typeof entity[relationSeedValueKey] === 'string' ||
+                    typeof entity[relationSeedValueKey] === 'number'
+                ) {
+                    filters[relationSeedValueKey] = entity[relationSeedValueKey];
+                }
             }
         }
     }
