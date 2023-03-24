@@ -1,5 +1,4 @@
 const axios = require('axios');
-const R = require('ramda');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -95,14 +94,14 @@ class Entity {
         this.data; //?
         this.seeder.seededModelNames; //?
         if (this.data) {
-            console.log('🚀 ~ create ~ this.data:', this.seeder.modelName);
+            console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
 
             const filters = setFilters({ entity: this.data, toSkip: this.keysToSkip });
 
             console.log('🚀 ~ create ~ filters:', filters);
 
             filters; //?
-            const [existingEntity] = await strapi.entityService.findMany(
+            const existingEntity = await strapi.entityService.findMany(
                 `api::${this.seeder.modelName}.${this.seeder.modelName}`,
                 {
                     filters,
@@ -110,7 +109,7 @@ class Entity {
             );
 
             if (existingEntity) {
-                return;
+                return existingEntity;
             }
 
             try {
@@ -120,6 +119,8 @@ class Entity {
                         data: this.data,
                     }
                 );
+
+                return createdEntity;
             } catch (error) {
                 console.log('🚀 ~ Entity ~ create ~ error.message:', error.message);
             }
@@ -159,7 +160,13 @@ class Parameter {
                 this.value = [];
             }
 
-            this.value.push(value);
+            if (Array.isArray(value)) {
+                for (const val of value) {
+                    this.value.push(val);
+                }
+            } else {
+                this.value.push(value);
+            }
         } else {
             this.value = value; //?
         }
@@ -181,17 +188,26 @@ class Parameter {
 
         if (this.type === 'media') {
             await this.downloadFile(this.seedValue);
+            return;
         } else if (this.type === 'relation') {
             await this.seedRelations();
+            return;
+        } else if (this.key === 'localizations') {
+            const localizationsContent = await this.seedLocalizations(); //?
+            this.setValue(localizationsContent);
+            return;
         } else if (this.type === 'dynamiczone' || this.type === 'component') {
             const componentsContent = await this.seedComponents(); //?
             this.setValue(componentsContent);
+            return;
         } else if (this.type === 'uid') {
             // generate unique uid
             // this.setValue(`${this.seedValue}-${Math.floor(Math.random() * 10e10)}`);
             this.setValue(this.seedValue);
+            return;
         } else {
             this.setValue(this.seedValue);
+            return;
         }
     }
 
@@ -258,7 +274,35 @@ class Parameter {
         this.entity.seeder.modelName; //?
     }
 
+    async seedLocalizations() {
+        const localizations = [];
+
+        for (const localizationSeedValue of this.seedValue) {
+            this.entity.seeder.apiPath; //?
+            this.seedValue; //?
+            this.attributes; //?
+            localizationSeedValue; //?
+            delete localizationSeedValue.localizations;
+
+            this.seedValue; //?
+
+            const entity = new Entity({
+                seed: localizationSeedValue,
+                schema: this.schema,
+                seeder: this.entity.seeder,
+            }); //?
+
+            const ceatedEntity = await entity.create();
+
+            localizations.push(ceatedEntity);
+        }
+
+        return localizations;
+    }
+
     async seedComponents() {
+        const components = [];
+
         for (const dzSeedValue of this.seedValue) {
             this.entity.seeder.apiPath; //?
             this.seedValue; //?
@@ -289,8 +333,10 @@ class Parameter {
 
             await entity.prepare();
 
-            return entity.data;
+            components.push(entity.data);
         }
+
+        return components;
     }
 
     async downloadFile(value) {
