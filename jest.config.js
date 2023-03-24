@@ -12,4 +12,5 @@ module.exports = {
         '<rootDir>/build',
         '<rootDir>/.tmp',
     ],
+    setupFiles: ['<rootDir>/setup-mock.js'],
 };

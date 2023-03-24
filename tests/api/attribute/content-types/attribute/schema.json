@@ -1,0 +1,54 @@
+{
+    "kind": "collectionType",
+    "collectionName": "attributes",
+    "info": {
+        "singularName": "attribute",
+        "pluralName": "attributes",
+        "displayName": "Attribute",
+        "description": ""
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {},
+    "attributes": {
+        "string": {
+            "pluginOptions": {},
+            "type": "string",
+            "required": false
+        },
+        "number": {
+            "pluginOptions": {},
+            "type": "integer",
+            "min": 0
+        },
+        "boolean": {
+            "pluginOptions": {},
+            "type": "boolean"
+        },
+        "media": {
+            "type": "media",
+            "multiple": false,
+            "required": false,
+            "allowedTypes": ["images", "files", "videos", "audios"]
+        },
+        "articles": {
+            "type": "relation",
+            "relation": "manyToMany",
+            "target": "api::article.article",
+            "mappedBy": "attributes"
+        },
+        "model": {
+            "type": "enumeration",
+            "enum": ["product", "article"],
+            "default": "product",
+            "required": true
+        },
+        "type": {
+            "type": "enumeration",
+            "enum": ["exact", "min", "max"],
+            "default": "exact",
+            "required": true
+        }
+    }
+}

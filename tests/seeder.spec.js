@@ -1,5 +1,7 @@
 const Seeder = require('../src/seeder/Seeder');
 
+beforeAll(() => {});
+
 describe('Seeder', () => {
     it('Seed should read sedds', async () => {
         const seededModelNames = [];

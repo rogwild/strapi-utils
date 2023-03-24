@@ -70,6 +70,7 @@ class Entity {
         this.schema = schema; //?
         this.data = {};
         this.seeder = seeder;
+        this.keysToSkip = ['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'];
     }
 
     async prepare() {
@@ -95,6 +96,23 @@ class Entity {
         this.seeder.seededModelNames; //?
         if (this.data) {
             console.log('🚀 ~ create ~ this.data:', this.seeder.modelName);
+
+            const filters = setFilters({ entity: this.data, toSkip: this.keysToSkip });
+
+            console.log('🚀 ~ create ~ filters:', filters);
+
+            filters; //?
+            const [existingEntity] = await strapi.entityService.findMany(
+                `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                {
+                    filters,
+                }
+            );
+
+            if (existingEntity) {
+                return;
+            }
+
             try {
                 const createdEntity = await strapi.entityService.create(
                     `api::${this.seeder.modelName}.${this.seeder.modelName}`,
@@ -102,8 +120,6 @@ class Entity {
                         data: this.data,
                     }
                 );
-
-                console.log('🚀 ~ create ~ createdEntity:', createdEntity);
             } catch (error) {
                 console.log('🚀 ~ Entity ~ create ~ error.message:', error.message);
             }
@@ -116,7 +132,7 @@ class Parameter {
         this.schema = schema;
         this.key = key;
         this.seedValue = seedValue;
-        this.toSkip = ['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'];
+
         this.entity = entity;
     }
 
@@ -131,6 +147,8 @@ class Parameter {
 
     setValue(value) {
         value; //?
+        // console.log('🚀 ~ setValue ~ value:', value);
+
         if (
             this.attributes?.multiple === true ||
             ['manyToMany'].includes(this.attributes?.relation) ||
@@ -153,7 +171,7 @@ class Parameter {
         this.key; //?
         this.type; //?
 
-        if (this.toSkip.includes(this.key)) {
+        if (this.entity.keysToSkip.includes(this.key)) {
             return;
         }
 
@@ -170,7 +188,8 @@ class Parameter {
             this.setValue(componentsContent);
         } else if (this.type === 'uid') {
             // generate unique uid
-            this.setValue(`${this.seedValue}-${Math.floor(Math.random() * 10e10)}`);
+            // this.setValue(`${this.seedValue}-${Math.floor(Math.random() * 10e10)}`);
+            this.setValue(this.seedValue);
         } else {
             this.setValue(this.seedValue);
         }
@@ -181,17 +200,21 @@ class Parameter {
         this.type; //?
         this.attributes; //?
         this.seedValue; //?
-        const tergetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
+        const targetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
 
         const alsoSeededModels = this.entity.seeder.seededModelNames.filter(
-            (modelName) => modelName === tergetModelName
+            (modelName) => modelName === targetModelName
         ); //?
-        if (alsoSeededModels?.length > 0 || this.entity.seeder?.skipModels?.includes(tergetModelName)) {
+        if (
+            alsoSeededModels?.length > 0 ||
+            this.entity.seeder?.skipModels?.includes(targetModelName) ||
+            targetModelName === this.entity.seeder.modelName
+        ) {
             return;
         }
 
         const seed = new Seeder({
-            modelName: tergetModelName,
+            modelName: targetModelName,
             apiPath: this.entity.seeder.apiPath,
             seededModelNames: this.entity.seeder.seededModelNames,
             skipModels: [...(this.entity.seeder?.skipModels || []), this.entity.seeder.modelName],
@@ -210,19 +233,7 @@ class Parameter {
             }
 
             for (const relationSeedValue of this.seedValue) {
-                const filters = {};
-
-                for (const relationSeedValueKey of Object.keys(relationSeedValue)) {
-                    relationSeedValueKey; //?
-                    if (this.toSkip.includes(relationSeedValueKey)) {
-                        continue;
-                    }
-
-                    if (typeof relationSeedValue[relationSeedValueKey] === 'string') {
-                        filters[relationSeedValueKey] = relationSeedValue[relationSeedValueKey];
-                    }
-                }
-                filters; //?
+                const filters = setFilters({ entity: relationSeedValue, toSkip: this.entity.keysToSkip });
                 const [relationEntity] = await strapi.entityService.findMany(this.attributes.target, {
                     filters,
                 });
@@ -232,19 +243,16 @@ class Parameter {
                 }
             }
         } else {
-            const filters = {};
-            for (const relationSeedValueKey of Object.keys(this.seedValue)) {
-                relationSeedValueKey; //?
-                if (this.toSkip.includes(relationSeedValueKey)) {
-                    continue;
-                }
-
-                if (typeof this.seedValue[relationSeedValueKey] === 'string') {
-                    filters[relationSeedValueKey] = this.seedValue[relationSeedValueKey];
-                }
-            }
+            const filters = setFilters({ entity: this.seedValue, toSkip: this.entity.keysToSkip });
 
             filters; //?
+            const [relationEntity] = await strapi.entityService.findMany(this.attributes.target, {
+                filters,
+            });
+
+            if (relationEntity) {
+                this.setValue(relationEntity);
+            }
         }
 
         this.entity.seeder.modelName; //?
@@ -335,3 +343,23 @@ class Parameter {
 }
 
 module.exports = Seeder;
+
+function setFilters({ entity, toSkip = [] }) {
+    const filters = {};
+
+    for (const relationSeedValueKey of Object.keys(entity)) {
+        relationSeedValueKey; //?
+        if (toSkip.includes(relationSeedValueKey)) {
+            continue;
+        }
+
+        if (
+            typeof entity[relationSeedValueKey] === 'string' ||
+            typeof entity[relationSeedValueKey] === 'number'
+        ) {
+            filters[relationSeedValueKey] = entity[relationSeedValueKey];
+        }
+    }
+
+    return filters;
+}
