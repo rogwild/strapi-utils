@@ -112,12 +112,20 @@ class Entity {
 
             console.log('🚀 ~ create ~ filters:', filters);
 
-            const existingEntities = await strapi.entityService.findMany(
-                `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                {
-                    filters,
-                }
-            );
+            let existingEntities;
+
+            if (Object.keys(filters)?.length) {
+                existingEntities = await strapi.entityService.findMany(
+                    `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                    {
+                        filters,
+                    }
+                );
+            }
+
+            if (this.seeder.modelName === 'store-product-variant') {
+                console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
+            }
 
             if (Array.isArray(existingEntities)) {
                 if (existingEntities.length) {
@@ -264,8 +272,9 @@ class Parameter {
 
         if (
             alsoSeededModels?.length === 0 &&
-            !this.entity.seeder?.skipModels?.includes(targetModelName) &&
-            targetModelName !== this.entity.seeder.modelName
+            targetModelName !== this.entity.seeder.modelName &&
+            this.entity.seeder.schema.attributes[this.key]?.mappedBy === this.entity.seeder.modelName
+            // !this.entity.seeder?.skipModels?.includes(targetModelName) &&
         ) {
             const seed = new Seeder({
                 modelName: targetModelName,
@@ -502,7 +511,17 @@ function setFilters({ entity, toSkip = [], id }) {
         const seederFilterBy = Object.keys(entity).find((key) => key === 'seeder_filter_by');
         if (seederFilterBy && entity['seeder_filter_by']) {
             for (const filterKey of entity['seeder_filter_by']) {
-                filters[filterKey] = entity[filterKey];
+                if (filterKey.includes('.')) {
+                    const key = filterKey.split('.');
+                    if (key.length === 2) {
+                        if (entity[key[0]] && typeof entity[key[0]] === 'object') {
+                            filters[key[0]] = entity[key[0]][key[1]];
+                            continue;
+                        }
+                    }
+                } else {
+                    filters[filterKey] = entity[filterKey];
+                }
             }
         } else {
             for (const relationSeedValueKey of Object.keys(entity)) {
