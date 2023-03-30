@@ -70,6 +70,19 @@ class Seeder {
                 new: created,
             });
         }
+        const createdIds = createdEntites.map((createdEntity) => {
+            return createdEntity.new.id;
+        });
+
+        const entites = await strapi.entityService.findMany(`api::${this.modelName}.${this.modelName}`);
+
+        for (const entity of entites) {
+            if (createdIds.includes(entity.id)) {
+                continue;
+            }
+
+            await strapi.entityService.delete(`api::${this.modelName}.${this.modelName}`, entity.id);
+        }
 
         this.seededModels[this.modelName] = createdEntites;
         return createdEntites;
