@@ -8,19 +8,26 @@ class Seeder {
         this.apiPath = apiPath;
         this.skipModels = skipModels;
         this.seededModels = seededModels;
+        this.seed = [];
     }
 
     async setSeed() {
         const pathToSeed = path.join(
             this.apiPath,
-            `/${this.modelName}/content-types/${this.modelName}/seed.json`
+            `/${this.modelName}/content-types/${this.modelName}/seeds`
         );
-        const seed = await fs.readFile(pathToSeed, 'utf8').catch((error) => {
-            // console.log(`🚀 ~ seed ~ error`, error);
-        });
+        const seedFiles = await fs.readdir(pathToSeed);
 
-        if (seed) {
-            this.seed = JSON.parse(seed);
+        if (!seedFiles?.length) {
+            return;
+        }
+
+        for (const seedFile of seedFiles) {
+            const seed = await fs.readFile(`${pathToSeed}/${seedFile}`, 'utf8').catch((error) => {
+                // console.log(`🚀 ~ seed ~ error`, error);
+            });
+
+            this.seed = [...this.seed, JSON.parse(seed)];
         }
     }
 
@@ -39,12 +46,12 @@ class Seeder {
     async seedEntites() {
         const createdEntites = [];
         this.seed; //?
-        if (!this.seed) {
+        if (!this.seed?.length) {
             this.seededModels[this.modelName] = undefined;
             return;
         }
 
-        if (Array.isArray(this.seed)) {
+        if (this.schema.kind === 'collectionType') {
             for (const seedItem of this.seed) {
                 const entity = new Entity({
                     seed: seedItem,
@@ -58,17 +65,19 @@ class Seeder {
                     new: created,
                 });
             }
-        } else if (typeof this.seed === 'object') {
+        } else if (this.schema.kind === 'singleType') {
             const entity = new Entity({
                 seed: this.seed,
                 schema: this.schema,
                 seeder: this,
             });
             const created = await entity.create();
-            createdEntites.push({
-                old: this.seed,
-                new: created,
-            });
+            if (created) {
+                createdEntites.push({
+                    old: this.seed,
+                    new: created,
+                });
+            }
         }
         const createdIds = createdEntites.map((createdEntity) => {
             return createdEntity.new.id;
@@ -136,37 +145,49 @@ class Entity {
                 );
             }
 
-            if (this.seeder.modelName === 'store-product-variant') {
-                console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
-            }
+            console.log('🚀 ~ create ~ existingEntities:', existingEntities);
 
             if (Array.isArray(existingEntities)) {
                 if (existingEntities.length) {
                     if (this.updateEntityIfExists) {
-                        const updatedEntity = await strapi.entityService.update(
-                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                            existingEntities[0].id,
-                            {
-                                data: this.data,
-                            }
-                        );
+                        try {
+                            const updatedEntity = await strapi.entityService.update(
+                                `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                                existingEntities[0].id,
+                                {
+                                    data: this.data,
+                                }
+                            );
 
-                        return updatedEntity;
+                            return updatedEntity;
+                        } catch (error) {
+                            console.log(
+                                `🚀 ~ Entity ${this.seeder.modelName} ~ update ~ error.message:`,
+                                error.message
+                            );
+                        }
                     } else {
                         return existingEntities[0];
                     }
                 }
             } else if (existingEntities) {
                 if (this.updateEntityIfExists) {
-                    const updatedEntity = await strapi.entityService.update(
-                        `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                        existingEntities.id,
-                        {
-                            data: this.data,
-                        }
-                    );
+                    try {
+                        const updatedEntity = await strapi.entityService.update(
+                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                            existingEntities.id,
+                            {
+                                data: this.data,
+                            }
+                        );
 
-                    return updatedEntity;
+                        return updatedEntity;
+                    } catch (error) {
+                        console.log(
+                            `🚀 ~ Entity ${this.seeder.modelName} ~ update ~ error.message:`,
+                            error.message
+                        );
+                    }
                 } else {
                     return existingEntities;
                 }
@@ -182,7 +203,7 @@ class Entity {
 
                 return createdEntity;
             } catch (error) {
-                console.log('🚀 ~ Entity ~ create ~ error.message:', error.message);
+                console.log(`🚀 ~ Entity ${this.seeder.modelName} ~ create ~ error.message:`, error.message);
             }
         }
     }
@@ -483,14 +504,24 @@ class Parameter {
                 }
             }
 
+            console.log('🚀 ~ downloadFile ~ value:', value);
+
             const file = await axios({
                 method: 'GET',
                 url: value.url,
                 responseType: 'arraybuffer',
                 ...additionalAttributes,
-            }).then(function (response) {
-                return response.data;
-            });
+            })
+                .then(function (response) {
+                    return response.data;
+                })
+                .catch((error) => {
+                    console.log('🚀 ~ downloadFile ~ error:', error);
+                });
+
+            if (!file) {
+                return;
+            }
 
             const fileMeta = {
                 name: value.name.toLowerCase(),
@@ -533,7 +564,9 @@ function setFilters({ entity, toSkip = [], id }) {
                         }
                     }
                 } else {
-                    filters[filterKey] = entity[filterKey];
+                    if (entity[filterKey]) {
+                        filters[filterKey] = entity[filterKey];
+                    }
                 }
             }
         } else {
