@@ -33,6 +33,10 @@ async function modelDumper(apiPath, modelName) {
     let oldSeedFiles = await fs.readdir(pathToSeed);
 
     for (const oldSeedFile of oldSeedFiles) {
+        if (oldSeedFile === '.gitkeep') {
+            continue;
+        }
+
         await fs.unlink(path.join(`${pathToSeed}/${oldSeedFile}`));
     }
 
@@ -62,7 +66,7 @@ async function modelDumper(apiPath, modelName) {
 
             console.log('🚀 ~ modelDumper ~ new seed created', fileName);
         }
-    } else if (typeof entites === 'object') {
+    } else if (entites && typeof entites === 'object') {
         const json = JSON.stringify(entites, null, 4);
         const fileName = `${pathToSeed}/${entites.id}.json`;
 
