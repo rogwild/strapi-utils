@@ -8,7 +8,6 @@ class Seeder {
         this.apiPath = apiPath;
         this.skipModels = skipModels;
         this.seededModels = seededModels;
-        this.seed = [];
     }
 
     async setSeed() {
@@ -16,10 +15,20 @@ class Seeder {
             this.apiPath,
             `/${this.modelName}/content-types/${this.modelName}/seeds`
         );
-        const seedFiles = await fs.readdir(pathToSeed);
+
+        let seedFiles;
+        try {
+            seedFiles = await fs.readdir(pathToSeed);
+        } catch (error) {
+            console.log('🚀 ~ setSeed ~ error:', error);
+        }
 
         if (!seedFiles?.length) {
             return;
+        }
+
+        if (this.schema.kind === 'singleType' && seedFiles.length > 1) {
+            throw new Error('Single Type entity can have just one json file');
         }
 
         for (const seedFile of seedFiles) {
@@ -27,7 +36,15 @@ class Seeder {
                 // console.log(`🚀 ~ seed ~ error`, error);
             });
 
-            this.seed = [...this.seed, JSON.parse(seed)];
+            if (this.schema.kind === 'collectionType') {
+                if (!this.seed) {
+                    this.seed = [];
+                }
+
+                this.seed = [...this.seed, JSON.parse(seed)];
+            } else {
+                this.seed = JSON.parse(seed);
+            }
         }
     }
 
@@ -46,7 +63,7 @@ class Seeder {
     async seedEntites() {
         const createdEntites = [];
         this.seed; //?
-        if (!this.seed?.length) {
+        if (!this.seed) {
             this.seededModels[this.modelName] = undefined;
             return;
         }
@@ -66,31 +83,79 @@ class Seeder {
                 });
             }
         } else if (this.schema.kind === 'singleType') {
+            const sanitizedSeed = { ...this.seed };
+
+            if (sanitizedSeed.localizations) {
+                sanitizedSeed.localizations = [];
+                sanitizedSeed.seeder_filter_by = ['locale'];
+            }
+
             const entity = new Entity({
-                seed: this.seed,
+                seed: sanitizedSeed,
                 schema: this.schema,
                 seeder: this,
             });
-            const created = await entity.create();
-            if (created) {
+            const mainEntityCreated = await entity.create();
+            if (mainEntityCreated) {
                 createdEntites.push({
                     old: this.seed,
-                    new: created,
+                    new: mainEntityCreated,
                 });
+
+                this.seededModels[this.modelName] = [
+                    {
+                        old: this.seed,
+                        new: mainEntityCreated,
+                    },
+                ];
+            }
+
+            if (this.seed?.localizations?.length) {
+                for (const localization of this.seed.localizations) {
+                    const entity = new Entity({
+                        seed: { ...localization, seeder_filter_by: ['locale'] },
+                        schema: this.schema,
+                        seeder: this,
+                    });
+                    const created = await entity.create();
+                    if (created) {
+                        createdEntites.push({
+                            old: this.seed,
+                            new: created,
+                        });
+                    }
+
+                    const mainEntity = await strapi.entityService.update(
+                        `api::${this.modelName}.${this.modelName}`,
+                        mainEntityCreated.id,
+                        {
+                            populate: '*',
+                        }
+                    );
+
+                    await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                        where: { id: mainEntity.id },
+                        data: {
+                            localizations: [...mainEntity.localizations, created.id],
+                        },
+                    });
+                }
             }
         }
         const createdIds = createdEntites.map((createdEntity) => {
             return createdEntity.new.id;
         });
 
-        const entites = await strapi.entityService.findMany(`api::${this.modelName}.${this.modelName}`);
+        const entites = await strapi.db.query(`api::${this.modelName}.${this.modelName}`).findMany();
 
-        for (const entity of entites) {
-            if (createdIds.includes(entity.id)) {
-                continue;
+        if (entites?.length) {
+            for (const entity of entites) {
+                if (createdIds.includes(entity.id)) {
+                    continue;
+                }
+
+                await strapi.entityService.delete(`api::${this.modelName}.${this.modelName}`, entity.id);
             }
-
-            await strapi.entityService.delete(`api::${this.modelName}.${this.modelName}`, entity.id);
         }
 
         this.seededModels[this.modelName] = createdEntites;
@@ -137,49 +202,24 @@ class Entity {
             let existingEntities;
 
             if (Object.keys(filters)?.length) {
-                existingEntities = await strapi.entityService.findMany(
-                    `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                    {
-                        filters,
-                    }
-                );
+                existingEntities = await strapi.db
+                    .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
+                    .findMany({
+                        where: filters,
+                    });
             }
 
-            console.log('🚀 ~ create ~ existingEntities:', existingEntities);
-
-            if (Array.isArray(existingEntities)) {
-                if (existingEntities.length) {
-                    if (this.updateEntityIfExists) {
-                        try {
-                            const updatedEntity = await strapi.entityService.update(
-                                `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                                existingEntities[0].id,
-                                {
-                                    data: this.data,
-                                }
-                            );
-
-                            return updatedEntity;
-                        } catch (error) {
-                            console.log(
-                                `🚀 ~ Entity ${this.seeder.modelName} ~ update ~ error.message:`,
-                                error.message
-                            );
-                        }
-                    } else {
-                        return existingEntities[0];
-                    }
-                }
-            } else if (existingEntities) {
+            if (existingEntities?.length) {
                 if (this.updateEntityIfExists) {
                     try {
-                        const updatedEntity = await strapi.entityService.update(
-                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                            existingEntities.id,
-                            {
+                        const updatedEntity = await strapi.db
+                            .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
+                            .update({
+                                where: {
+                                    id: existingEntities[0].id,
+                                },
                                 data: this.data,
-                            }
-                        );
+                            });
 
                         return updatedEntity;
                     } catch (error) {
@@ -189,17 +229,16 @@ class Entity {
                         );
                     }
                 } else {
-                    return existingEntities;
+                    return existingEntities[0];
                 }
             }
 
             try {
-                const createdEntity = await strapi.entityService.create(
-                    `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                    {
+                const createdEntity = await strapi.db
+                    .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
+                    .create({
                         data: this.data,
-                    }
-                );
+                    });
 
                 return createdEntity;
             } catch (error) {
@@ -398,15 +437,31 @@ class Parameter {
 
             this.seedValue; //?
 
-            const entity = new Entity({
-                seed: localizationSeedValue,
-                schema: this.schema,
+            let id;
+            if (localizationSeedValue.id) {
+                id = this.entity.seeder.seededModels[this.entity.seeder.modelName]?.find((seededItems) => {
+                    if (seededItems.old.id === localizationSeedValue.id) {
+                        return true;
+                    }
+                })?.new?.id;
+            }
+            const filters = setFilters({
+                entity: { ...localizationSeedValue },
+                toSkip: this.entity.keysToSkip,
                 seeder: this.entity.seeder,
-            }); //?
+                id,
+            });
 
-            const ceatedEntity = await entity.create();
+            filters; //?
+            const relationEntities = await strapi.db
+                .query(`api::${this.entity.seeder.modelName}.${this.entity.seeder.modelName}`)
+                .findMany({
+                    where: filters,
+                });
 
-            localizations.push(ceatedEntity);
+            if (relationEntities?.length) {
+                localizations.push(relationEntities[0]);
+            }
         }
 
         return localizations;
@@ -516,7 +571,7 @@ class Parameter {
                     return response.data;
                 })
                 .catch((error) => {
-                    console.log('🚀 ~ downloadFile ~ error:', error);
+                    console.log('🚀 ~ downloadFile ~ error:', error?.message);
                 });
 
             if (!file) {

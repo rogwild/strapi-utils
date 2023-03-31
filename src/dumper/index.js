@@ -1,5 +1,3 @@
-const axios = require('axios');
-const R = require('ramda');
 const fs = require('fs/promises');
 const path = require('path');
 const getDeepPopulate = require('../api/get-deep-populate');
@@ -24,13 +22,18 @@ async function dumper(apiPath) {
 }
 
 async function modelDumper(apiPath, modelName) {
-    const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seed.json`);
-    const seed = await fs.readFile(pathToSeed, 'utf8').catch((error) => {
-        // console.log(`🚀 ~ seed ~ error`, error);
-    });
+    const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seeds`);
 
-    if (!seed) {
+    try {
+        await fs.stat(pathToSeed);
+    } catch (error) {
         return;
+    }
+
+    let oldSeedFiles = await fs.readdir(pathToSeed);
+
+    for (const oldSeedFile of oldSeedFiles) {
+        await fs.unlink(path.join(`${pathToSeed}/${oldSeedFile}`));
     }
 
     const uid = `api::${modelName}.${modelName}`;
@@ -48,13 +51,27 @@ async function modelDumper(apiPath, modelName) {
         populate,
     });
 
-    const json = JSON.stringify(entites, null, 4);
+    if (Array.isArray(entites)) {
+        for (const entity of entites) {
+            const json = JSON.stringify(entity, null, 4);
+            const fileName = `${pathToSeed}/${entity.id}.json`;
 
-    await fs.writeFile(pathToSeed, json).catch((error) => {
-        console.log('🚀 ~ modelDumper ~ error', error);
-    });
+            await fs.writeFile(`${pathToSeed}/${entity.id}.json`, json).catch((error) => {
+                console.log('🚀 ~ modelDumper ~ error', error);
+            });
 
-    console.log('🚀 ~ modelDumper ~ new seed created', pathToSeed);
+            console.log('🚀 ~ modelDumper ~ new seed created', fileName);
+        }
+    } else if (typeof entites === 'object') {
+        const json = JSON.stringify(entites, null, 4);
+        const fileName = `${pathToSeed}/${entites.id}.json`;
+
+        await fs.writeFile(fileName, json).catch((error) => {
+            console.log('🚀 ~ modelDumper ~ error', error);
+        });
+
+        console.log('🚀 ~ modelDumper ~ new seed created', fileName);
+    }
 }
 
 module.exports = dumper;

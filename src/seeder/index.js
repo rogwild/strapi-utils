@@ -18,18 +18,20 @@ async function seeder(apiPath) {
         const seededModels = {};
 
         for (const modelName of apiDirs) {
-            try {
-                const seed = new Seeder({
-                    modelName,
-                    apiPath,
-                    seededModelNames,
-                    seededModels,
-                });
-                await seed.setSchema();
-                await seed.setSeed();
-                await seed.seedEntites();
-            } catch (error) {
-                console.log('🚀 ~ seeder ~ error', modelName, error?.message);
+            if (modelName === 'meta') {
+                try {
+                    const seed = new Seeder({
+                        modelName,
+                        apiPath,
+                        seededModelNames,
+                        seededModels,
+                    });
+                    await seed.setSchema();
+                    await seed.setSeed();
+                    await seed.seedEntites();
+                } catch (error) {
+                    console.log('🚀 ~ seeder ~ error', modelName, error?.message);
+                }
             }
         }
     }
