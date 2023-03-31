@@ -20,7 +20,7 @@ class Seeder {
         try {
             seedFiles = await fs.readdir(pathToSeed);
         } catch (error) {
-            console.log('🚀 ~ setSeed ~ error:', error);
+            console.log('🚀 ~ setSeed ~ no seed for model:', this.modelName, ' skipping migration');
         }
 
         if (!seedFiles?.length) {
@@ -212,14 +212,13 @@ class Entity {
             if (existingEntities?.length) {
                 if (this.updateEntityIfExists) {
                     try {
-                        const updatedEntity = await strapi.db
-                            .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
-                            .update({
-                                where: {
-                                    id: existingEntities[0].id,
-                                },
+                        const updatedEntity = await strapi.entityService.update(
+                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                            existingEntities[0].id,
+                            {
                                 data: this.data,
-                            });
+                            }
+                        );
 
                         return updatedEntity;
                     } catch (error) {
@@ -234,11 +233,12 @@ class Entity {
             }
 
             try {
-                const createdEntity = await strapi.db
-                    .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
-                    .create({
+                const createdEntity = await strapi.entityService.create(
+                    `api::${this.seeder.modelName}.${this.seeder.modelName}`,
+                    {
                         data: this.data,
-                    });
+                    }
+                );
 
                 return createdEntity;
             } catch (error) {
