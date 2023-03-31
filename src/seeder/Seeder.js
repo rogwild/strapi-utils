@@ -346,7 +346,8 @@ class Parameter {
         if (
             alsoSeededModels?.length === 0 &&
             targetModelName !== this.entity.seeder.modelName &&
-            this.entity.seeder.schema.attributes[this.key]?.mappedBy === this.entity.seeder.modelName
+            (this.entity.seeder.schema.attributes[this.key]?.mappedBy === this.entity.seeder.modelName ||
+                this.entity.data.__component)
             // !this.entity.seeder?.skipModels?.includes(targetModelName) &&
         ) {
             const seed = new Seeder({
