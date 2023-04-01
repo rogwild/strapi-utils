@@ -70,17 +70,102 @@ class Seeder {
 
         if (this.schema.kind === 'collectionType') {
             for (const seedItem of this.seed) {
+                const sanitizedSeed = { ...seedItem };
+
+                if (sanitizedSeed.localizations) {
+                    sanitizedSeed.localizations = [];
+                    sanitizedSeed.seeder_filter_by = [...(sanitizedSeed.seeder_filter_by || []), 'locale'];
+                }
+
                 const entity = new Entity({
-                    seed: seedItem,
+                    seed: sanitizedSeed,
                     schema: this.schema,
                     seeder: this,
                 });
-                const created = await entity.create();
+                const mainEntityCreated = await entity.create();
 
-                createdEntites.push({
-                    old: seedItem,
-                    new: created,
-                });
+                if (mainEntityCreated) {
+                    createdEntites.push({
+                        old: this.seed,
+                        new: mainEntityCreated,
+                    });
+
+                    this.seededModels[this.modelName] = [
+                        {
+                            old: this.seed,
+                            new: mainEntityCreated,
+                        },
+                    ];
+                }
+
+                if (seedItem?.localizations?.length) {
+                    for (const localization of seedItem.localizations) {
+                        const sanitizedLocalizationSeed = {
+                            ...localization,
+                            seeder_filter_by: [...(localization.seeder_filter_by || []), 'locale'],
+                        };
+
+                        const entity = new Entity({
+                            seed: sanitizedLocalizationSeed,
+                            schema: this.schema,
+                            seeder: this,
+                        });
+
+                        const created = await entity.create();
+                        if (created) {
+                            createdEntites.push({
+                                old: this.seed,
+                                new: created,
+                            });
+                        }
+
+                        const mainEntity = await strapi.entityService.update(
+                            `api::${this.modelName}.${this.modelName}`,
+                            mainEntityCreated.id,
+                            {
+                                populate: {
+                                    localizations: {
+                                        populate: '*',
+                                    },
+                                },
+                            }
+                        );
+
+                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                            where: { id: created.id },
+                            data: {
+                                localizations: [
+                                    ...mainEntity.localizations.filter(
+                                        (localization) => localization.locale !== created.locale
+                                    ),
+                                    mainEntity.id,
+                                ],
+                            },
+                        });
+
+                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                            where: { id: mainEntity.id },
+                            data: {
+                                localizations: [...mainEntity.localizations, created.id],
+                            },
+                        });
+
+                        for (const mainEntityLocalization of mainEntity.localizations) {
+                            await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                                where: { id: mainEntityLocalization.id },
+                                data: {
+                                    localizations: [
+                                        ...mainEntityLocalization.localizations.filter(
+                                            (localization) =>
+                                                localization.locale !== mainEntityLocalization.locale
+                                        ),
+                                        created.id,
+                                    ],
+                                },
+                            });
+                        }
+                    }
+                }
             }
         } else if (this.schema.kind === 'singleType') {
             const sanitizedSeed = { ...this.seed };
@@ -96,6 +181,7 @@ class Seeder {
                 seeder: this,
             });
             const mainEntityCreated = await entity.create();
+
             if (mainEntityCreated) {
                 createdEntites.push({
                     old: this.seed,
@@ -129,9 +215,25 @@ class Seeder {
                         `api::${this.modelName}.${this.modelName}`,
                         mainEntityCreated.id,
                         {
-                            populate: '*',
+                            populate: {
+                                localizations: {
+                                    populate: '*',
+                                },
+                            },
                         }
                     );
+
+                    await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                        where: { id: created.id },
+                        data: {
+                            localizations: [
+                                ...mainEntity.localizations.filter(
+                                    (localization) => localization.locale !== created.locale
+                                ),
+                                mainEntity.id,
+                            ],
+                        },
+                    });
 
                     await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
                         where: { id: mainEntity.id },
@@ -139,6 +241,21 @@ class Seeder {
                             localizations: [...mainEntity.localizations, created.id],
                         },
                     });
+
+                    for (const mainEntityLocalization of mainEntity.localizations) {
+                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                            where: { id: mainEntityLocalization.id },
+                            data: {
+                                localizations: [
+                                    ...mainEntityLocalization.localizations.filter(
+                                        (localization) =>
+                                            localization.locale !== mainEntityLocalization.locale
+                                    ),
+                                    created.id,
+                                ],
+                            },
+                        });
+                    }
                 }
             }
         }
@@ -622,6 +739,25 @@ function setFilters({ entity, toSkip = [], id }) {
                 } else {
                     if (entity[filterKey]) {
                         filters[filterKey] = entity[filterKey];
+                    }
+                }
+            }
+
+            if (
+                entity['seeder_filter_by'].length === 1 &&
+                entity['seeder_filter_by'].find((key) => key === 'locale')
+            ) {
+                for (const relationSeedValueKey of Object.keys(entity)) {
+                    relationSeedValueKey; //?
+                    if ([...toSkip, 'publishedAt'].includes(relationSeedValueKey)) {
+                        continue;
+                    }
+
+                    if (
+                        typeof entity[relationSeedValueKey] === 'string' ||
+                        typeof entity[relationSeedValueKey] === 'number'
+                    ) {
+                        filters[relationSeedValueKey] = entity[relationSeedValueKey];
                     }
                 }
             }
