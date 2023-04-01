@@ -114,7 +114,7 @@ class Seeder {
                         const created = await entity.create();
                         if (created) {
                             createdEntites.push({
-                                old: this.seed,
+                                old: localization,
                                 new: created,
                             });
                         }
@@ -206,7 +206,7 @@ class Seeder {
                     const created = await entity.create();
                     if (created) {
                         createdEntites.push({
-                            old: this.seed,
+                            old: localization,
                             new: created,
                         });
                     }
@@ -421,6 +421,9 @@ class Parameter {
         this.key; //?
         this.type; //?
         this.attributes; //?
+        if (this.entity.seeder.modelName === 'category') {
+            console.log('🚀 ~ prpare ~ this.entity.seeder.modelName:', this.entity.seeder.modelName);
+        }
 
         if (this.type === 'media') {
             await this.downloadFile(this.seedValue);
@@ -506,8 +509,8 @@ class Parameter {
                     seeder: this.entity.seeder,
                     id,
                 });
-                const [relationEntity] = await strapi.entityService.findMany(this.attributes.target, {
-                    filters,
+                const [relationEntity] = await strapi.db.query(this.attributes.target).findMany({
+                    where: filters,
                 });
 
                 if (relationEntity) {
@@ -531,8 +534,8 @@ class Parameter {
             });
 
             filters; //?
-            const [relationEntity] = await strapi.entityService.findMany(this.attributes.target, {
-                filters,
+            const [relationEntity] = await strapi.db.query(this.attributes.target).findMany({
+                where: filters,
             });
 
             if (relationEntity) {
