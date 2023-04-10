@@ -68,10 +68,6 @@ class Seeder {
             return;
         }
 
-        if (this.modelName === 'store-product-variant') {
-            console.log('🚀 ~ seedEntites ~ this.modelName:', this.modelName);
-        }
-
         if (this.schema.kind === 'collectionType') {
             for (const seedItem of this.seed) {
                 const sanitizedSeed = { ...seedItem };
