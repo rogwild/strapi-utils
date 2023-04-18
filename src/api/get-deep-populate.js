@@ -64,7 +64,7 @@ function getPopulateFor(attributeName, model, options, level) {
  * @param {Number} [level=1] - Current level of nested call
  * @returns {Object}
  */
-const getDeepPopulate = (uid, { maxLevel = 5 } = {}, level = 1) => {
+const getDeepPopulate = (uid, { maxLevel = 4 } = {}, level = 1) => {
     if (level > maxLevel) {
         return {};
     }
