@@ -41,7 +41,7 @@ async function modelDumper(apiPath, modelName) {
     }
 
     const uid = `api::${modelName}.${modelName}`;
-    const populate = getDeepPopulate(uid);
+    const populate = getDeepPopulate(uid, { maxLevel: 2 });
 
     if (populate.localizations) {
         populate.localizations = {
