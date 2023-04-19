@@ -17,22 +17,32 @@ function getActionFactorsParams({ name, user, authFactors }) {
     console.log('🚀 ~ getActionFactorsParams ~ actions', actions);
 }
 
-function getAuthFactorsParams({ name, user, authFactors }) {
-    const { isFirst, factorIndex, isLast } = getAuthFactorIndex(name, authFactors);
+function getAuthFactorsParams({ name, user, authFactors, pipeRes }) {
+    const { isFirst, factorIndex, isLast } = getAuthFactorIndex(name, authFactors, pipeRes?.isFirst || false);
 
     // console.log('🚀 ~ getAuthFactorsParams ~ authFactors', authFactors);
 
     let nextAuthFactor = isLast ? undefined : authFactors.factors[factorIndex + 1];
 
     if (nextAuthFactor?.handler === 'user.checkOtp' && !user.is_otp_confirmation_enabled) {
-        return getAuthFactorsParams({ name: 'user.checkOtp', user, authFactors });
+        return getAuthFactorsParams({
+            name: 'user.checkOtp',
+            user,
+            authFactors,
+            pipeRes: { isFirst, factorIndex, isLast },
+        });
     }
 
     if (
         nextAuthFactor?.handler === 'auth.emailConfirmation' &&
         (!user.is_email_confirmation_enabled || !user.confirmed)
     ) {
-        return getAuthFactorsParams({ name: 'auth.emailConfirmation', user, authFactors });
+        return getAuthFactorsParams({
+            name: 'auth.emailConfirmation',
+            user,
+            authFactors,
+            pipeRes: { isFirst, factorIndex, isLast },
+        });
     }
 
     if (
@@ -40,7 +50,12 @@ function getAuthFactorsParams({ name, user, authFactors }) {
         user.is_phone_confirmation_enabled &&
         (!user.phone || user.phone === '')
     ) {
-        return getAuthFactorsParams({ name: 'auth.phoneConfirmation', user, authFactors });
+        return getAuthFactorsParams({
+            name: 'auth.phoneConfirmation',
+            user,
+            authFactors,
+            pipeRes: { isFirst, factorIndex, isLast },
+        });
     }
 
     return {
@@ -60,10 +75,10 @@ function clearNextAuthFactors(nextAuthFactor, user) {
     return localnextAuthFactor;
 }
 
-function getAuthFactorIndex(name, authFactors) {
+function getAuthFactorIndex(name, authFactors, passedIsFirst) {
     authFactors;
     name;
-    let isFirst = false;
+    let isFirst = passedIsFirst;
     let isLast = false;
     let factorIndex = 0;
 
