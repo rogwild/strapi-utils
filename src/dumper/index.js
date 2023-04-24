@@ -53,6 +53,9 @@ async function modelDumper(apiPath, modelName) {
 
     const entites = await strapi.entityService.findMany(uid, {
         populate,
+        pagination: {
+            limit: -1,
+        },
     });
 
     if (Array.isArray(entites)) {
