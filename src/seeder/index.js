@@ -17,6 +17,8 @@ async function seeder(apiPath) {
         const seededModelNames = [];
         const seededModels = {};
 
+        console.log('Seeding is started');
+
         for (const modelName of apiDirs) {
             try {
                 const seed = new Seeder({
@@ -32,6 +34,8 @@ async function seeder(apiPath) {
                 console.log('🚀 ~ seeder ~ error', modelName, error?.message);
             }
         }
+
+        console.log('Seeding is finished');
     }
 }
 

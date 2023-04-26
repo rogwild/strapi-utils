@@ -20,7 +20,7 @@ class Seeder {
         try {
             seedFiles = await fs.readdir(pathToSeed);
         } catch (error) {
-            console.log('🚀 ~ setSeed ~ no seed for model:', this.modelName, ' skipping migration');
+            // console.log('🚀 ~ setSeed ~ no seed for model:', this.modelName, ' skipping migration');
         }
 
         if (!seedFiles?.length) {
@@ -68,6 +68,10 @@ class Seeder {
             return;
         }
 
+        // if (this.modelName === 'product') {
+        //     console.log('🚀 ~ seedEntites ~ this.modelName:', this.modelName);
+        // }
+
         if (this.schema.kind === 'collectionType') {
             for (const seedItem of this.seed) {
                 const sanitizedSeed = { ...seedItem };
@@ -89,13 +93,6 @@ class Seeder {
                         old: seedItem,
                         new: mainEntityCreated,
                     });
-
-                    this.seededModels[this.modelName] = [
-                        {
-                            old: seedItem,
-                            new: mainEntityCreated,
-                        },
-                    ];
                 }
 
                 if (seedItem?.localizations?.length) {
@@ -187,13 +184,6 @@ class Seeder {
                     old: this.seed,
                     new: mainEntityCreated,
                 });
-
-                this.seededModels[this.modelName] = [
-                    {
-                        old: this.seed,
-                        new: mainEntityCreated,
-                    },
-                ];
             }
 
             if (this.seed?.localizations?.length) {
@@ -310,11 +300,11 @@ class Entity {
         await this.prepare();
 
         if (this.data) {
-            console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
+            // console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
 
             const filters = setFilters({ entity: this.data, toSkip: this.keysToSkip, seeder: this.seeder });
 
-            console.log('🚀 ~ create ~ filters:', filters);
+            // console.log('🚀 ~ create ~ filters:', filters);
 
             let existingEntities;
 
@@ -421,9 +411,6 @@ class Parameter {
         this.key; //?
         this.type; //?
         this.attributes; //?
-        if (this.entity.seeder.modelName === 'category') {
-            console.log('🚀 ~ prpare ~ this.entity.seeder.modelName:', this.entity.seeder.modelName);
-        }
 
         if (this.type === 'media') {
             await this.downloadFile(this.seedValue);
@@ -457,7 +444,7 @@ class Parameter {
         this.seedValue; //?
         const targetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
 
-        console.log('🚀 ~ seedRelations ~ targetModelName:', targetModelName);
+        // console.log('🚀 ~ seedRelations ~ targetModelName:', targetModelName);
 
         const alsoSeededModels = Object.keys(this.entity.seeder.seededModels).filter(
             (modelName) => modelName === targetModelName
@@ -680,7 +667,7 @@ class Parameter {
                 }
             }
 
-            console.log('🚀 ~ downloadFile ~ value:', value);
+            // console.log('🚀 ~ downloadFile ~ value:', value);
 
             const file = await axios({
                 method: 'GET',
