@@ -15,14 +15,56 @@ async function dumper(apiPath) {
     const apiDirs = await fs.readdir(apiPath);
 
     if (apiDirs.length) {
-        for (const modelName of apiDirs) {
-            await modelDumper(apiPath, modelName);
+        for (const modelDirName of apiDirs) {
+            await modelDumper({
+                dirPath: apiPath,
+                modelDirName,
+                modelName: modelDirName,
+                entityName: modelDirName,
+                type: 'api',
+            });
         }
+    }
+
+    const extensionsPath = path.join(apiPath, '../extensions');
+    const extensionsDirs = await fs.readdir(extensionsPath);
+    if (extensionsDirs.length) {
+        for (const modelDirName of extensionsDirs) {
+            if (modelDirName === 'plugin-i18n') {
+                const entityName = 'locale';
+
+                await modelDumper({
+                    dirPath: extensionsPath,
+                    modelDirName,
+                    modelName: 'i18n',
+                    entityName,
+                    type: 'plugin',
+                });
+            }
+        }
+    }
+
+    const corePath = path.join(apiPath, '../core');
+    try {
+        const coreDir = await fs.readdir(corePath);
+        if (coreDir) {
+            await modelDumper({
+                dirPath: corePath,
+                modelDirName: 'core-store',
+                modelName: 'core-store',
+                type: 'strapi',
+            });
+        }
+    } catch (error) {
+        console.log('🚀 ~ dumper ~ error:', error);
     }
 }
 
-async function modelDumper(apiPath, modelName) {
-    const pathToSeed = path.join(apiPath, `/${modelName}/content-types/${modelName}/seeds`);
+async function modelDumper({ dirPath, modelDirName, modelName, entityName, type = 'api' }) {
+    const pathToSeed = path.join(
+        dirPath,
+        `/${modelDirName}/content-types${entityName ? `/${entityName}` : ''}/seeds`
+    );
 
     try {
         await fs.stat(pathToSeed);
@@ -40,23 +82,29 @@ async function modelDumper(apiPath, modelName) {
         await fs.unlink(path.join(`${pathToSeed}/${oldSeedFile}`));
     }
 
-    const uid = `api::${modelName}.${modelName}`;
-    const populate = getDeepPopulate(uid, { maxLevel: 4 });
+    const uid = `${type}::${modelName}${entityName ? `.${entityName}` : ''}`;
+    let entites;
 
-    if (populate.localizations) {
-        populate.localizations = {
-            populate: {
-                ...populate,
+    if (entityName) {
+        const populate = getDeepPopulate(uid, { maxLevel: 4 });
+
+        if (populate.localizations) {
+            populate.localizations = {
+                populate: {
+                    ...populate,
+                },
+            };
+        }
+
+        entites = await strapi.entityService.findMany(uid, {
+            populate,
+            pagination: {
+                limit: -1,
             },
-        };
+        });
+    } else {
+        entites = await strapi.db.query(uid).findMany();
     }
-
-    const entites = await strapi.entityService.findMany(uid, {
-        populate,
-        pagination: {
-            limit: -1,
-        },
-    });
 
     if (Array.isArray(entites)) {
         for (const entity of entites) {

@@ -1,19 +1,24 @@
 const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
+const { getService: i18nGetService } = require('@strapi/plugin-i18n/server/utils');
 
 class Seeder {
-    constructor({ modelName, apiPath, skipModels, seededModels }) {
+    constructor({ modelName, dirPath, type = 'api', modelDirName, entityName, skipModels, seededModels }) {
+        this.modelDirName = modelDirName;
+        this.entityName = entityName;
         this.modelName = modelName;
-        this.apiPath = apiPath;
+        this.dirPath = dirPath;
         this.skipModels = skipModels;
         this.seededModels = seededModels;
+        this.type = type;
+        this.uid = `${type}::${modelName}${entityName ? `.${entityName}` : ''}`;
     }
 
     async setSeed() {
         const pathToSeed = path.join(
-            this.apiPath,
-            `/${this.modelName}/content-types/${this.modelName}/seeds`
+            this.dirPath,
+            `/${this.modelDirName}/content-types${this.entityName ? `/${this.entityName}` : ''}/seeds`
         );
 
         let seedFiles;
@@ -36,7 +41,7 @@ class Seeder {
                 // console.log(`🚀 ~ seed ~ error`, error);
             });
 
-            if (this.schema.kind === 'collectionType') {
+            if (this.schema.kind === 'collectionType' || this.modelDirName === 'plugin-i18n') {
                 if (!this.seed) {
                     this.seed = [];
                 }
@@ -50,8 +55,8 @@ class Seeder {
 
     async setSchema() {
         const pathToSchema = path.join(
-            this.apiPath,
-            `/${this.modelName}/content-types/${this.modelName}/schema.json`
+            this.dirPath,
+            `/${this.modelDirName}/content-types${this.entityName ? `/${this.entityName}` : ''}/schema.json`
         ); //?
         const schema = await fs.readFile(pathToSchema, 'utf8').catch((error) => {
             // console.log(`🚀 ~ seed ~ error`, error);
@@ -72,7 +77,7 @@ class Seeder {
         //     console.log('🚀 ~ seedEntites ~ this.modelName:', this.modelName);
         // }
 
-        if (this.schema.kind === 'collectionType') {
+        if (this.schema.kind === 'collectionType' || this.modelDirName === 'plugin-i18n') {
             for (const seedItem of this.seed) {
                 const sanitizedSeed = { ...seedItem };
 
@@ -116,19 +121,15 @@ class Seeder {
                             });
                         }
 
-                        const mainEntity = await strapi.entityService.update(
-                            `api::${this.modelName}.${this.modelName}`,
-                            mainEntityCreated.id,
-                            {
-                                populate: {
-                                    localizations: {
-                                        populate: '*',
-                                    },
+                        const mainEntity = await strapi.entityService.update(this.uid, mainEntityCreated.id, {
+                            populate: {
+                                localizations: {
+                                    populate: '*',
                                 },
-                            }
-                        );
+                            },
+                        });
 
-                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                        await strapi.db.query(this.uid).update({
                             where: { id: created.id },
                             data: {
                                 localizations: [
@@ -140,7 +141,7 @@ class Seeder {
                             },
                         });
 
-                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                        await strapi.db.query(this.uid).update({
                             where: { id: mainEntity.id },
                             data: {
                                 localizations: [...mainEntity.localizations, created.id],
@@ -148,7 +149,7 @@ class Seeder {
                         });
 
                         for (const mainEntityLocalization of mainEntity.localizations) {
-                            await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                            await strapi.db.query(this.uid).update({
                                 where: { id: mainEntityLocalization.id },
                                 data: {
                                     localizations: [
@@ -201,19 +202,15 @@ class Seeder {
                         });
                     }
 
-                    const mainEntity = await strapi.entityService.update(
-                        `api::${this.modelName}.${this.modelName}`,
-                        mainEntityCreated.id,
-                        {
-                            populate: {
-                                localizations: {
-                                    populate: '*',
-                                },
+                    const mainEntity = await strapi.entityService.update(this.uid, mainEntityCreated.id, {
+                        populate: {
+                            localizations: {
+                                populate: '*',
                             },
-                        }
-                    );
+                        },
+                    });
 
-                    await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                    await strapi.db.query(this.uid).update({
                         where: { id: created.id },
                         data: {
                             localizations: [
@@ -225,7 +222,7 @@ class Seeder {
                         },
                     });
 
-                    await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                    await strapi.db.query(this.uid).update({
                         where: { id: mainEntity.id },
                         data: {
                             localizations: [...mainEntity.localizations, created.id],
@@ -233,7 +230,7 @@ class Seeder {
                     });
 
                     for (const mainEntityLocalization of mainEntity.localizations) {
-                        await strapi.db.query(`api::${this.modelName}.${this.modelName}`).update({
+                        await strapi.db.query(this.uid).update({
                             where: { id: mainEntityLocalization.id },
                             data: {
                                 localizations: [
@@ -253,7 +250,7 @@ class Seeder {
             return createdEntity.new.id;
         });
 
-        const entites = await strapi.db.query(`api::${this.modelName}.${this.modelName}`).findMany();
+        const entites = await strapi.db.query(this.uid).findMany();
 
         if (entites?.length) {
             for (const entity of entites) {
@@ -261,7 +258,7 @@ class Seeder {
                     continue;
                 }
 
-                await strapi.entityService.delete(`api::${this.modelName}.${this.modelName}`, entity.id);
+                await strapi.db.query(this.uid).delete({ where: { id: entity.id } });
             }
         }
 
@@ -300,7 +297,7 @@ class Entity {
         await this.prepare();
 
         if (this.data) {
-            // console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.modelName);
+            // console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.uid);
 
             const filters = setFilters({ entity: this.data, toSkip: this.keysToSkip, seeder: this.seeder });
 
@@ -309,25 +306,29 @@ class Entity {
             let existingEntities;
 
             if (Object.keys(filters)?.length) {
-                existingEntities = await strapi.db
-                    .query(`api::${this.seeder.modelName}.${this.seeder.modelName}`)
-                    .findMany({
-                        where: filters,
-                    });
+                existingEntities = await strapi.db.query(this.seeder.uid).findMany({
+                    where: filters,
+                });
             }
 
             if (existingEntities?.length) {
                 if (this.updateEntityIfExists) {
                     try {
-                        const updatedEntity = await strapi.entityService.update(
-                            `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                            existingEntities[0].id,
-                            {
-                                data: this.data,
-                            }
-                        );
+                        if (this.seeder.entityName) {
+                            const updatedEntity = await strapi.entityService.update(
+                                this.seeder.uid,
+                                existingEntities[0].id,
+                                { data: this.data }
+                            );
 
-                        return updatedEntity;
+                            return updatedEntity;
+                        } else {
+                            const updatedEntity = await strapi.db
+                                .query(this.seeder.uid)
+                                .update({ where: { id: existingEntities[0].id }, data: this.data });
+
+                            return updatedEntity;
+                        }
                     } catch (error) {
                         console.log(
                             `🚀 ~ Entity ${this.seeder.modelName} ~ update ~ error.message:`,
@@ -340,14 +341,19 @@ class Entity {
             }
 
             try {
-                const createdEntity = await strapi.entityService.create(
-                    `api::${this.seeder.modelName}.${this.seeder.modelName}`,
-                    {
+                if (this.seeder.entityName) {
+                    const createdEntity = await strapi.entityService.create(this.seeder.uid, {
                         data: this.data,
-                    }
-                );
+                    });
 
-                return createdEntity;
+                    return createdEntity;
+                } else {
+                    const createdEntity = await strapi.db.query(this.seeder.uid).create({
+                        data: this.data,
+                    });
+
+                    return createdEntity;
+                }
             } catch (error) {
                 console.log(`🚀 ~ Entity ${this.seeder.modelName} ~ create ~ error.message:`, error.message);
             }
@@ -442,7 +448,8 @@ class Parameter {
         this.type; //?
         this.attributes; //?
         this.seedValue; //?
-        const targetModelName = this.attributes.target.replace('api::', '').split('.')[0]; //?
+        const targetType = this.attributes.target.split('::')[0];
+        const targetModelName = this.attributes.target.split('::')[1].split('.')[0]; //?
 
         // console.log('🚀 ~ seedRelations ~ targetModelName:', targetModelName);
 
@@ -458,8 +465,11 @@ class Parameter {
             // !this.entity.seeder?.skipModels?.includes(targetModelName) &&
         ) {
             const seed = new Seeder({
+                type: targetType,
+                modelDirName: targetModelName,
                 modelName: targetModelName,
-                apiPath: this.entity.seeder.apiPath,
+                entityName: targetModelName,
+                dirPath: this.entity.seeder.dirPath,
                 skipModels: [...(this.entity.seeder?.skipModels || []), this.entity.seeder.modelName].filter(
                     (model) => {
                         return model !== targetModelName;
@@ -537,7 +547,7 @@ class Parameter {
         const localizations = [];
 
         for (const localizationSeedValue of this.seedValue) {
-            this.entity.seeder.apiPath; //?
+            this.entity.seeder.dirPath; //?
             this.seedValue; //?
             this.attributes; //?
             localizationSeedValue; //?
@@ -561,11 +571,9 @@ class Parameter {
             });
 
             filters; //?
-            const relationEntities = await strapi.db
-                .query(`api::${this.entity.seeder.modelName}.${this.entity.seeder.modelName}`)
-                .findMany({
-                    where: filters,
-                });
+            const relationEntities = await strapi.db.query(this.entity.seeder.uid).findMany({
+                where: filters,
+            });
 
             if (relationEntities?.length) {
                 localizations.push(relationEntities[0]);
@@ -584,7 +592,7 @@ class Parameter {
             const components = [];
 
             for (const dzSeedValue of this.seedValue) {
-                this.entity.seeder.apiPath; //?
+                this.entity.seeder.dirPath; //?
                 this.seedValue; //?
                 this.attributes; //?
                 dzSeedValue; //?
@@ -599,7 +607,7 @@ class Parameter {
                 }
 
                 const pathToSchema = path.join(
-                    this.entity.seeder.apiPath,
+                    this.entity.seeder.dirPath,
                     `../components/${componentPath}.json`
                 ); //?
                 const schema = await fs.readFile(pathToSchema, 'utf8').catch((error) => {
@@ -631,7 +639,7 @@ class Parameter {
                 return;
             }
 
-            const pathToSchema = path.join(this.entity.seeder.apiPath, `../components/${componentPath}.json`); //?
+            const pathToSchema = path.join(this.entity.seeder.dirPath, `../components/${componentPath}.json`); //?
             const schema = await fs.readFile(pathToSchema, 'utf8').catch((error) => {
                 // console.log(`🚀 ~ seed ~ error`, error);
             }); //?
