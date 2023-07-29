@@ -37,6 +37,10 @@ class Seeder {
         }
 
         for (const seedFile of seedFiles) {
+            if (!seedFile.includes('.json')) {
+                continue;
+            }
+
             const seed = await fs.readFile(`${pathToSeed}/${seedFile}`, 'utf8').catch((error) => {
                 // console.log(`🚀 ~ seed ~ error`, error);
             });
