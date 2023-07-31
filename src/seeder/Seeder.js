@@ -1,7 +1,6 @@
 const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
-const { getService: i18nGetService } = require('@strapi/plugin-i18n/server/utils');
 
 class Seeder {
     constructor({ modelName, dirPath, type = 'api', modelDirName, entityName, skipModels, seededModels }) {
