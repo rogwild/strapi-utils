@@ -69,6 +69,25 @@ class Seeder {
         this.schema = JSON.parse(schema);
     }
 
+    async getSchema(model) {
+        if (model.includes('plugin') || model.includes('strapi::')) {
+            return;
+        }
+
+        const modelName = model.split('::')[1].split('.')[0];
+
+        const pathToSchema = path.join(
+            this.dirPath,
+            `/${modelName}/content-types${modelName ? `/${modelName}` : ''}/schema.json`
+        ); //?
+
+        const schema = await fs.readFile(pathToSchema, 'utf8').catch((error) => {
+            // console.log(`🚀 ~ seed ~ error`, error);
+        }); //?
+
+        return JSON.parse(schema);
+    }
+
     async seedEntites() {
         const createdEntites = [];
         this.seed; //?
@@ -288,6 +307,7 @@ class Entity {
                 key: seedKey,
                 seedValue: this.seed[seedKey],
                 entity: this,
+                seeder: this.seeder,
             });
             await parameter.prpare();
 
@@ -303,7 +323,13 @@ class Entity {
         if (this.data) {
             // console.log('🚀 ~ create ~ this.seeder.modelName:', this.seeder.uid);
 
-            const filters = setFilters({ entity: this.data, toSkip: this.keysToSkip, seeder: this.seeder });
+            const schema = await this.seeder.getSchema(this.seeder.uid);
+            const filters = setFilters({
+                entity: this.data,
+                toSkip: this.keysToSkip,
+                seeder: this.seeder,
+                schema,
+            });
 
             // console.log('🚀 ~ create ~ filters:', filters);
 
@@ -366,11 +392,11 @@ class Entity {
 }
 
 class Parameter {
-    constructor({ schema, key, seedValue, entity }) {
+    constructor({ schema, key, seedValue, entity, seeder }) {
         this.schema = schema;
         this.key = key;
         this.seedValue = seedValue;
-
+        this.seeder = seeder;
         this.entity = entity;
     }
 
@@ -504,11 +530,13 @@ class Parameter {
                         }
                     })?.new?.id;
                 }
+                const schema = await this.seeder.getSchema(this.attributes.target);
                 const filters = setFilters({
                     entity: relationSeedValue,
                     toSkip: this.entity.keysToSkip,
                     seeder: this.entity.seeder,
                     id,
+                    schema,
                 });
                 const [relationEntity] = await strapi.db.query(this.attributes.target).findMany({
                     where: filters,
@@ -527,11 +555,13 @@ class Parameter {
                     }
                 })?.new?.id;
             }
+            const schema = await this.seeder.getSchema(this.attributes.target);
             const filters = setFilters({
                 entity: this.seedValue,
                 toSkip: this.entity.keysToSkip,
                 seeder: this.entity.seeder,
                 id,
+                schema,
             });
 
             filters; //?
@@ -567,11 +597,13 @@ class Parameter {
                     }
                 })?.new?.id;
             }
+            const schema = await this.seeder.getSchema(this.entity.seeder.uid);
             const filters = setFilters({
                 entity: { ...localizationSeedValue },
                 toSkip: this.entity.keysToSkip,
                 seeder: this.entity.seeder,
                 id,
+                schema,
             });
 
             filters; //?
@@ -721,7 +753,7 @@ class Parameter {
 
 module.exports = Seeder;
 
-function setFilters({ entity, toSkip = [], id }) {
+function setFilters({ entity, toSkip = [], id, schema }) {
     const filters = {};
 
     if (id) {
@@ -780,5 +812,18 @@ function setFilters({ entity, toSkip = [], id }) {
         }
     }
 
-    return filters;
+    const sanitizedFilters = { ...filters };
+
+    if (schema) {
+        for (const filterKey of Object.keys(filters)) {
+            if (['id', 'locale'].includes(filterKey)) {
+                continue;
+            }
+            if (!schema.attributes[filterKey]) {
+                delete sanitizedFilters[filterKey];
+            }
+        }
+    }
+
+    return sanitizedFilters;
 }
