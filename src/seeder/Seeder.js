@@ -65,7 +65,11 @@ class Seeder {
             // console.log(`🚀 ~ seed ~ error`, error);
         }); //?
 
-        this.schema = JSON.parse(schema);
+        try {
+            this.schema = JSON.parse(schema);
+        } catch (error) {
+            // console.log('🚀 ~ setSchema ~ error:', error);
+        }
     }
 
     async getSchema(model) {
@@ -507,6 +511,10 @@ class Parameter {
                 seededModels: this.entity.seeder.seededModels,
             });
             await seed.setSchema();
+            if (!seed.schema) {
+                return;
+            }
+
             await seed.setSeed();
             await seed.seedEntites();
         }
