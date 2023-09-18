@@ -31,7 +31,7 @@ class Seeder {
             return;
         }
 
-        if (this.schema.kind === 'singleType' && seedFiles.length > 1) {
+        if (this.schema.kind === 'singleType' && seedFiles.filter((s) => s.includes('.json')).length > 1) {
             throw new Error('Single Type entity can have just one json file');
         }
 
